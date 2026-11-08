@@ -1,25 +1,32 @@
 # Run checks on Workers Builds
 
-Use this guide to see which Workers Builds triggers run on each push and to connect them.
+This page is for maintainers of this project's own Cloudflare resources.
+Its procedures need access to the maintainers' Cloudflare account. `<account-id>` means the `account_id` value in `wrangler.jsonc`.
+
+An outside contributor needs only this summary:
+
+- Run `npm run ci` yourself. A pull request from a fork starts no build, because it pushes no branch to this repository.
+- `npm run ci` uses no Cloudflare credentials. It runs no browser suite and no hosted suite.
+- `npm run ci` needs a network connection. Its last step, the Gitleaks scan, supports only Linux x64. On another platform the command fails at that step, after the other checks have run.
+
 Use [deployment settings](cloudflare-build-settings.md) for commands, limits, and checks that stay on demand.
-Use [activation](activate-cloudflare-development.md) for the separate development-installation approval.
 
 ## Build and publication flow
 
 Four Workers build from this repository. Each Worker has its own Workers Builds trigger.
-Each build reports a commit status named `Workers Builds: <worker>`.
+Each build reports a GitHub check named `Workers Builds: <worker>`.
 
 | Worker | Branches it builds | Build command | Deploy command | Result |
 | --- | --- | --- | --- | --- |
 | `minsky-ci` | All branches, including `main` | `npm run ci` | `npm run ci:worker` | A check only. It publishes nothing. |
-| `minsky-preview` | `main` only, which does not publish. Builds for other branches are switched off. See [Publish branch previews](#publish-branch-previews). | `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci` | `npm run deploy` | Publishes nothing while branch builds are off. When they are on, publishes the branch to `https://minsky-preview.icaic-minsky.workers.dev` with test data. |
-| `minsky-docs` | All branches | `npm ci --prefix site && npm run docs:build` | `npx wrangler deploy` on `main`, `npx wrangler versions upload` on other branches | Publishes the docs from `main`. Uploads a docs preview version for other branches. |
+| `minsky-preview` | `main` only, which does not publish. Builds for other branches are switched off. See [Publish branch previews](#publish-branch-previews). | `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci` | `npm run deploy` | Publishes nothing while branch builds are off. |
+| `minsky-docs` | All branches | `npm ci --prefix site && npm run docs:build` | `npx wrangler deploy --config wrangler.docs.jsonc` on `main`, `npx wrangler versions upload --config wrangler.docs.jsonc` on other branches | Publishes the docs from `main`. Uploads a docs preview version for other branches. |
 | `minsky-dev` | `main` only | `npm run ci` | `npm run deploy` | Publishes `main` to `https://minsky-dev.icaic-minsky.workers.dev` with development data. |
 
 ### When you push a branch
 
 1. `minsky-ci` runs the checks.
-2. `minsky-preview` does not build, because branch previews are switched off. See [Publish branch previews](#publish-branch-previews).
+2. `minsky-preview` does not build, because branch previews are switched off.
 3. `minsky-docs` uploads a docs preview version. That version receives no traffic.
 4. `minsky-dev` does not build.
 
@@ -32,26 +39,9 @@ Each build reports a commit status named `Workers Builds: <worker>`.
 
 A failed check stops its build. The deploy command does not run, and the Worker keeps its previous version.
 On `minsky-preview`, only a failed app build or a failed target check stops publication.
-A pull request from a fork starts no builds, because it pushes no branch to this repository.
-GitHub Actions runs no checks or publication. The GitHub account stays on the free plan.
-
-The sections below give the dashboard steps for each trigger.
-
-## How app previews stay separate
-
-A preview runs branch code that nobody has reviewed yet. It must not change the data of `minsky-dev`.
-So app previews use a separate Worker, `minsky-preview`, with its own resources and token:
-
-- D1 database `minsky-preview` and private bucket `minsky-preview-images`. They hold only test data.
-- A build token that cannot publish `minsky-dev` and reaches only the preview database and bucket. Workers Builds cannot use such a token yet, so branch previews are switched off.
-- `minsky-dev` builds only `main`. Its token never runs branch code.
-
-Cloudflare preview URLs stay disabled on both Workers. Cloudflare does not create them for Workers that use a Durable Object.
-Docs previews use Cloudflare preview URLs. They are safe because the docs contain no application data.
 
 ## Connect one CI Worker
 
-You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
 Create a Worker named `minsky-ci` if it does not exist.
 Do not reuse `minsky-dev` or `minsky-docs`.
 
@@ -72,16 +62,14 @@ That command reads `wrangler.jsonc` and would publish `minsky-dev`.
    The dry run does not upload a version and does not send traffic.
    It does not read `wrangler.jsonc`.
 9. Leave the root directory empty so the commands run at the repository root.
-10. Add build variable `SKIP_DEPENDENCY_INSTALL` with value `1`.
-    The check script installs the root and `site` lockfiles itself.
-    Build variables are under **Settings > Build > Build variables and secrets**.
+10. Add these build variables to both `minsky-ci` triggers, under **Settings > Build > Build variables and secrets**:
+    - `SKIP_DEPENDENCY_INSTALL` with value `1`. The check script installs the root and `site` lockfiles itself.
+    - `NODE_VERSION` with value `22.23.4`.
 11. Do not add `CLOUDFLARE_API_TOKEN` or `AUTH_SECRET` to this Worker.
     Ordinary checks do not use those values.
 12. Leave **Settings > Build > Build watch paths** at the default, which includes every file.
 
-Both `minsky-ci` triggers pin the build variable `NODE_VERSION` to `22.23.4`.
-That value is set in Cloudflare, and a read-back confirmed it.
-The `minsky-dev` and `minsky-preview` triggers pin the same value. Their builds run `npm run ci` on `main`, and that command runs the docs build.
+The `minsky-dev`, `minsky-preview`, and `minsky-docs` triggers pin the same `NODE_VERSION`.
 `.nvmrc` contains `22` and stays for local tools.
 See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) and [build configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/).
 
@@ -90,7 +78,7 @@ See [the build image](https://developers.cloudflare.com/workers/ci-cd/builds/bui
 Push a commit to a branch other than `main`.
 Then confirm all of the following:
 
-- The commit shows a Workers Builds check. Copy that check's name from the commit status.
+- The commit shows a Workers Builds check. Copy that check's name from the commit.
 - The build log runs `npm run ci` and exits zero.
 - The next log step runs `npm run ci:worker` and says it did not upload.
 - The log does not deploy `minsky-dev` or `minsky-docs`.
@@ -108,11 +96,11 @@ The `minsky-docs` Worker has two Workers Builds triggers. Both use the repositor
 The exact settings are in [deployment settings](cloudflare-build-settings.md#docs-workers-builds).
 
 - A push to `main` builds the site and runs `npx wrangler deploy --config wrangler.docs.jsonc`. The new version serves `https://minsky-docs.icaic-minsky.workers.dev`.
-- A push to any other branch builds the site and runs `npx wrangler versions upload --config wrangler.docs.jsonc`. The preview version does not receive traffic. The build log shows its preview URL.
+- A push to any other branch builds the site and runs `npx wrangler versions upload --config wrangler.docs.jsonc`. The preview version does not receive traffic. The build log shows its preview URL. The docs contain no application data, so they use Cloudflare preview URLs.
 
 The docs build does not wait for the `minsky-ci` checks. A docs build failure does not change the published version.
 To publish again without a new push, start a build of `main` from **Workers & Pages > minsky-docs > Deployments**.
-If Workers Builds is not available, run `npm ci && npm ci --prefix site && npm run docs:deploy` from an updated `main` with a Wrangler login for account `458ad6a930b0fb717796dfa19ca6a2b1`.
+If Workers Builds is not available, run `npm ci && npm ci --prefix site && npm run docs:deploy` from an updated `main` with a Wrangler login for account `<account-id>`.
 
 To recreate the triggers, open **Workers & Pages > minsky-docs > Settings > Build**:
 
@@ -126,7 +114,6 @@ To recreate the triggers, open **Workers & Pages > minsky-docs > Settings > Buil
 
 ## Publish the application
 
-On 2026-10-24 the owner chose automatic publication of `main` to `minsky-dev`.
 One `minsky-dev` build runs the checks, applies new D1 migrations, and publishes the complete Worker.
 A failed step stops the build. Later steps do not run.
 `minsky-dev` is a development installation. It is not production.
@@ -148,7 +135,7 @@ The deploy command is `npm run deploy`. It runs these steps in order:
 ### Prepare the deployment token
 
 The automatic Workers Builds token cannot read D1. The migration step and the target check fail with that token.
-Create a user API token for account `458ad6a930b0fb717796dfa19ca6a2b1` with these permissions:
+Create a user API token for account `<account-id>` with these permissions:
 
 - **Account > Workers Scripts > Edit**
 - **Account > D1 > Edit**
@@ -160,8 +147,6 @@ Create a user API token for account `458ad6a930b0fb717796dfa19ca6a2b1` with thes
 Limit the token to that account. Do not add other accounts or zones.
 
 ### Connect the Worker
-
-You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
 
 1. In the Cloudflare dashboard, open **Workers & Pages > minsky-dev > Settings > Build**.
 2. Connect GitHub repository `GiftedNovaHD/minsky`.
@@ -178,7 +163,7 @@ You need access to Cloudflare account `458ad6a930b0fb717796dfa19ca6a2b1`.
    | --- | --- |
    | `SKIP_DEPENDENCY_INSTALL` | `1` |
    | `NODE_VERSION` | `22.23.4` |
-   | `CLOUDFLARE_ACCOUNT_ID` | `458ad6a930b0fb717796dfa19ca6a2b1` |
+   | `CLOUDFLARE_ACCOUNT_ID` | `<account-id>` |
    | `VITE_ENVIRONMENT` | `development` |
    | `MINSKY_DEV_CLOUDFLARE_CONFIG` | `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` |
    | `MINSKY_DEV_DATABASE_ID` | `a1832f97-4d4c-45c2-a848-8d3dfd0b74f5` |
@@ -217,15 +202,25 @@ Pause publication during a live contest. A merge then does not change the applic
 
 ### Recover from a failed or bad publication
 
+Find the case that matches the failure:
+
 - If `npm run ci` fails, nothing is published. Fix the check and merge again.
 - If the build stops before `wrangler deploy`, the previous Worker keeps serving. Read the fixed error message. Provider output is withheld on purpose.
 - If the message says that the migration outcome is unknown, compare `SELECT name FROM d1_migrations` with `src/server/adapters/d1/migrations` before you retry.
-- If a published version is bad, roll back the Worker with `npx wrangler rollback --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`. Write migrations that only add tables, columns, or indexes, so that the earlier Worker still runs against the newer schema.
+- If a published version is bad, roll back the Worker with `npx wrangler rollback --config src/server/adapters/cloudflare/deploy/development.wrangler.jsonc`. Write migrations that only add tables, columns, or indexes, so that the earlier Worker still runs against the newer schema. Do not roll back to a version that has only static assets.
 - If a migration damaged data, find `Restore point before migrations:` in the deploy log. Run the `npx wrangler d1 time-travel restore` command on that line. It returns `minsky-development` to its state before the migration and discards later writes. See [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/).
+
+These rules apply to every repair of `minsky-dev`:
+
+- Do not start another publication until you know the state of the failed one.
+- Keep new D1 records and R2 objects, unless you restore a bookmark as the last case describes. Do not apply down migrations. Do not run `bootstrap` again.
+- Keep the existing `AUTH_SECRET` on the Worker. Do not create or rotate it to repair a publication.
+- If Worker `minsky-development-candidate` still exists, keep its URLs and its cron disabled. It uses the same database with a different live-update namespace. Its dispatcher could mark a notification delivered without notifying `minsky-dev` clients. Disabling its URLs does not stop the cron. Cron removal can take 15 minutes to propagate, and a running invocation can last 15 more. Wait 30 minutes after you remove the cron, and require zero pending notification records, before you publish.
+- Before you resume publication, check sign-in, workflows, images, and live updates on `minsky-dev`. The deploy checks do not cover them.
 
 ### Read the Worker logs
 
-Workers Logs is on for `minsky-dev`. The next publication applies this setting.
+Workers Logs is on for `minsky-dev`. The `observability` setting in `development.wrangler.jsonc` controls it.
 The Worker writes one JSON object for each failure. It does not log a successful request.
 
 To read the logs in the dashboard:
@@ -265,7 +260,7 @@ It does not check data changes such as `UPDATE` or `DELETE`.
 To ship a migration that removes or renames schema:
 
 1. Pause publication, as [Pause publication](#pause-publication) describes.
-2. Add the file name and the reason to `reviewedDestructiveMigrations` in `src/server/adapters/cloudflare/tooling/migrations.mjs`, in the same PR.
+2. Add the file name and the reason to `reviewedDestructiveMigrations` in `src/server/adapters/cloudflare/tooling/migrations.mjs`, in the same pull request.
 3. After the merge, apply the migration and publish by hand. Record the restore point first.
 4. Reconnect the trigger.
 
@@ -275,61 +270,32 @@ The script guards the complete Worker:
 
 - The app needs its API code, D1 database, private R2 bucket, and live coordinator. The script has no assets-only upload path that could remove them.
 - It validates the generated configuration and exact hosted targets before upload. After upload, it checks the published targets, live bindings, and an anonymous rejection at the authentication API.
-- On `minsky-dev`, it publishes the app only from `main`. On `minsky-preview`, it publishes every other branch that the trigger builds. See [Publish branch previews](#publish-branch-previews).
+- On `minsky-dev`, it publishes the app only from `main`. On `minsky-preview`, it publishes every other branch that the trigger builds.
 
-These checks do not verify authenticated behavior. The installation and activation procedures require the full application checks.
+These checks do not verify authenticated behavior. [Run the shared provider tests](run-provider-tests.md) covers that behavior on the isolated CI target.
 A broken application target cannot block the docs, because Workers Builds publishes them separately.
 
 ## Publish branch previews
 
-The owner chose one shared preview on 2026-10-24 and connected the `minsky-preview` trigger. Its first preview was `9c70247`.
+Branch previews are switched off. `minsky-preview` keeps serving its last preview, and a push to `main` builds on this Worker and publishes nothing.
+A preview runs branch code that nobody has reviewed. It must not reach the data of `minsky-dev`.
 
-**Branch previews are switched off.** On 2026-10-24 the owner turned off builds for non-production branches on `minsky-preview`.
-The trigger's **API token** field offers only tokens that Workers Builds creates itself.
-Such a token can publish every Worker, including `minsky-dev`, and can change every R2 bucket. The preview also needs D1 Edit, and the form could not limit it to one database.
-Branch code runs with that token, and it can change the deploy checks. So any branch could reach `minsky-dev` and its data.
-The Worker keeps serving its last preview, `980653e`. A push to `main` still builds on this Worker and publishes nothing.
-
-Turn branch builds on again only when one of these is true:
+Turn branch builds on again only when one of these conditions is true:
 
 - The trigger can use a token that reaches only the preview Worker, database `minsky-preview`, and bucket `minsky-preview-images`. See [Prepare the preview token](#prepare-the-preview-token).
 - The preview resources move to a separate Cloudflare account, so that its token can reach nothing else.
 
-The rest of this section describes the preview when branch builds are on.
-
-Each push to a branch other than `main` publishes that branch to `https://minsky-preview.icaic-minsky.workers.dev`.
-A push to `main` builds on this Worker too, but it does not publish. `minsky-dev` publishes `main`.
-
-The build that finishes last replaces the preview. When two branches build at the same time, an older push can therefore replace a newer one.
-If another build replaces the preview while a build verifies it, that build reports `Another build replaced minsky-preview after this upload.` and passes. The newer build verifies its own deployment.
-
-The build command only installs dependencies. It removes the token first, so package install scripts run without it.
-The preview does not wait for the checks, so it can show code that fails them. Check the `Workers Builds: minsky-ci` status for the same commit.
-
-The deploy command is `npm run deploy`, the same as on `minsky-dev`.
-With `VITE_ENVIRONMENT=preview` on a branch, it runs the steps in [Publish the application](#publish-the-application) against `minsky-preview`.
-The build step (`deploy-workers.mjs --build`) runs steps 1 to 3. The upload step runs steps 1 and 2 again, then steps 4 to 8:
-
-1. Stop if any `MINSKY_DEV_*` variable is set. Those variables belong to the `minsky-dev` build.
-2. Stop unless the committed configuration names Worker `minsky-preview`, database `minsky-preview`, bucket `minsky-preview-images`, and the database ID in `MINSKY_PREVIEW_DATABASE_ID`.
-3. Build the Cloudflare application for the preview origin.
-4. Stop if the build's commit is no longer the head of its branch.
-5. Confirm the account, the database, the private bucket, and the `AUTH_SECRET` name. Record a restore point.
-6. Apply new migrations to `minsky-preview`. Stop if the database lacks a migration from the checkout.
-   Migrations that other branches applied are accepted, because every migration only adds schema.
-7. Record the revision that the preview serves now.
-8. Publish the Worker `minsky-preview` with `wrangler deploy`. Verify its revision, bindings, and an anonymous `401`.
-
-The configuration is `src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc`.
-`npm run cloudflare:install -- configure` generated it from `preview.settings.json` in the same directory.
+To turn them on, prepare the token, connect the Worker, and confirm the first preview, as the sections below describe.
+Each push to a branch other than `main` then publishes that branch to `https://minsky-preview.icaic-minsky.workers.dev`.
 
 ### Prepare the preview token
 
-The `minsky-preview` Worker must exist before you can limit a token to it.
-It exists since 2026-10-24, with `AUTH_SECRET`, all migrations, and a test admin account.
-Until its first build, it served a placeholder that returned `503`. A local `wrangler deploy` through an authenticating proxy cannot upload static assets, so the first full publication runs in Workers Builds.
-Every branch that the trigger builds runs its own code with this token. That includes code that nobody has reviewed, Dependabot updates, and the npm packages that they install.
-The checks in `scripts/deploy-workers.mjs` and `scripts/ci.mjs` are branch code too. A branch can change them. So only the token's permissions keep branch code away from development data.
+On 2026-10-24 the trigger's **API token** field accepted only tokens that Workers Builds creates. Such a token can publish every Worker and change every R2 bucket, and the form could not limit D1 to one database.
+Check the field again before you continue.
+
+The `minsky-preview` Worker must exist before you can limit a token to it. It has `AUTH_SECRET` and a test admin account.
+
+A branch can change the checks in `scripts/deploy-workers.mjs` and `scripts/ci.mjs`. So only the token's permissions keep branch code away from development data.
 
 Create an account API token in **Manage Account > Account API Tokens > Create token > Custom token**:
 
@@ -340,10 +306,7 @@ Create an account API token in **Manage Account > Account API Tokens > Create to
 
 Do not use the `minsky-dev` token.
 If the form cannot limit D1 to `minsky-preview` and R2 to `minsky-preview-images`, do not create the token and do not connect the trigger.
-On 2026-10-24 the trigger accepted only tokens that Workers Builds creates. Those tokens cannot be limited this way.
-If the connected token is wider than this, disconnect the trigger or replace the token.
-A wider token lets any branch read or change `minsky-development` through the API.
-In that case, the preview needs its own Cloudflare account. That is an account decision for the owner.
+If the connected token is wider than this, disconnect the trigger or replace the token. A wider token lets any branch read or change `minsky-development` through the API.
 
 ### Connect the preview Worker
 
@@ -351,7 +314,7 @@ In that case, the preview needs its own Cloudflare account. That is an account d
 2. Connect GitHub repository `GiftedNovaHD/minsky`.
 3. Set the production branch to `main`. Enable builds for non-production branches only after you select a token that meets [Prepare the preview token](#prepare-the-preview-token).
    Exclude branches that match `dependabot/*`. Dependabot branches install package updates that nobody has reviewed. `minsky-ci` still checks them.
-4. Set the build command to `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci`.
+4. Set the build command to `env -u CLOUDFLARE_API_TOKEN -u CLOUDFLARE_API_KEY npm ci`. It removes the token first, so package install scripts run without it.
 5. Set the deploy command and the non-production branch deploy command to `npm run deploy`.
 6. Leave the root directory empty.
 7. Under **API token**, select the token from [Prepare the preview token](#prepare-the-preview-token).
@@ -361,7 +324,7 @@ In that case, the preview needs its own Cloudflare account. That is an account d
    | --- | --- |
    | `SKIP_DEPENDENCY_INSTALL` | `1` |
    | `NODE_VERSION` | `22.23.4` |
-   | `CLOUDFLARE_ACCOUNT_ID` | `458ad6a930b0fb717796dfa19ca6a2b1` |
+   | `CLOUDFLARE_ACCOUNT_ID` | `<account-id>` |
    | `VITE_ENVIRONMENT` | `preview` |
    | `MINSKY_PREVIEW_DATABASE_ID` | `3189b257-13f9-4e73-9bd1-bf211c7cbb25` |
 
@@ -369,6 +332,21 @@ In that case, the preview needs its own Cloudflare account. That is an account d
 10. Do not add `AUTH_SECRET`. That secret stays on the Worker.
 
 Optionally, protect `minsky-preview.icaic-minsky.workers.dev` with [Cloudflare Access](https://developers.cloudflare.com/workers/configuration/cloudflare-access/). The preview is public without it.
+
+### Know how a preview differs from `minsky-dev`
+
+With `VITE_ENVIRONMENT=preview` on a branch, `npm run deploy` runs the steps in [Publish the application](#publish-the-application) against `minsky-preview`, with these differences:
+
+- It stops if any `MINSKY_DEV_*` variable is set.
+- It stops unless `src/server/adapters/cloudflare/deploy/preview.wrangler.jsonc` names Worker `minsky-preview` and its origin, a database and a bucket whose names start with `minsky-preview`, and the database ID in `MINSKY_PREVIEW_DATABASE_ID`.
+- It stops if the database lacks a migration from the checkout. It accepts migrations that other branches applied, because every migration only adds schema.
+- It reads the revision that the preview serves before it publishes.
+
+`npm run cloudflare:install -- configure` generates that configuration from `preview.settings.json` in the same directory.
+
+The build that finishes last replaces the preview. When two branches build at the same time, an older push can replace a newer one.
+If another build replaces the preview while a build verifies it, that build reports `Another build replaced minsky-preview after this upload.` and passes. The newer build verifies its own deployment.
+The preview does not wait for the checks, so it can show code that fails them. Check `Workers Builds: minsky-ci` for the same commit.
 
 ### Confirm the first preview
 
@@ -382,9 +360,8 @@ Sign in with the preview test account. Its credentials are in a private file out
 
 ### Reset the preview data
 
-All branches share `minsky-preview`. A branch can apply a migration that another branch does not have.
+All branches share `minsky-preview`. A branch can apply a migration that another branch does not have, and the database keeps that schema after the branch is merged, renamed, or deleted.
 The other branch's build still publishes, because its code runs against the added schema.
-The preview database keeps that schema after the branch is merged, renamed, or deleted.
 
 A build stops at the migration comparison only when the database still lacks a migration from its checkout after the apply step. Inspect the applied migrations before you build again.
 The comparison checks names only. If you change a migration after a build applied it, the preview keeps the old version. Add a new migration instead, or reset the preview data.
@@ -396,6 +373,6 @@ The reset discards all preview data written after that point, including test acc
 ## Checks that stay on demand
 
 Browser tests need Chromium libraries that the [build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/) does not install.
-Hosted Cloudflare suites also exceed the 20 minute build limit, or they change isolated CI resources.
-Coding agents run those commands when the change needs them.
+Hosted Cloudflare suites change isolated CI resources, and a store suite can run longer than the 20 minute build limit.
+Run those commands by hand when the change needs them.
 The exact commands are in [deployment settings](cloudflare-build-settings.md#on-demand-checks).

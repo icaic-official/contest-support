@@ -5,25 +5,29 @@ description: Use the queue, hand off to a specialist, and choose who sees each m
 
 ## Use the queue
 
-**Queue** sorts unresolved issues by waiting time, longest first.
-Narrow it with the chips (phone) or status tabs (console).
+**Queue** sorts unresolved issues by unresolved time, longest first.
+Narrow the list with the chips on a phone or the status tabs in the console.
 
-In the console:
+In the console, use these keys:
 
 - <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd> finds an issue number, team, table, or page.
 - <kbd>J</kbd> and <kbd>K</kbd> move between rows. <kbd>Enter</kbd> opens one.
 
-Click the empty search box to browse teams by name. Team search matches text inside a name or location from the first letter, accepts letters typed in order, and tolerates small spelling errors. Select a suggestion; typed text alone does not select a team.
+Click the empty search box to browse teams by name. Team search matches text inside a name or location from the first letter, accepts letters typed in order, and tolerates small spelling errors. Select a suggestion, because typed text alone does not select a team.
 
-## Claim, hand off, resolve
+## Claim, hand off, and resolve
 
 1. Open an issue and select **Claim**. On a phone, **Claim and go** claims the oldest waiting issue.
 2. Investigate with the team.
-3. If you need a specialist, request a handoff. You stay the owner until another specialist accepts. The timer keeps running.
-4. Resolve with a summary. Pick a preset or write your own. Only the owner or an admin can resolve. An admin can resolve only an issue that someone has claimed.
+3. If you need a specialist, start a handoff. In the console, select **Escalate to specialist**. On a phone, select **More actions**, then **Escalate to a specialist**. Confirm with **Escalate to specialist**. You stay the owner until a specialist selects **Accept handoff**. The timer keeps running.
+4. Select **Resolve** and enter a summary. Pick a preset or write your own.
+
+Only the owner or an admin can resolve an issue. An admin can resolve only an issue that someone has claimed.
 
 The timer uses saved timestamps, so a refresh does not reset it.
 If someone else claims first, the new owner appears.
+
+A contest admin with no other role can reply, write internal notes, add images, and resolve a claimed issue. Claiming, handing off, and reopening need the Volunteer or Specialist role. Accepting a handoff needs the Specialist role.
 
 ## Choose the audience
 
@@ -36,22 +40,27 @@ Messages close when the issue is resolved. Select **Reopen issue** to continue.
 
 ## Attach images
 
-Staff can upload JPEG, PNG, or WebP while the event is active, also on resolved issues.
-Choose **Staff only** (default) or **Visible to the team** before upload. You cannot change it later.
+Staff can upload JPEG, PNG, or WebP images, also on resolved issues.
+Choose **Staff only**, which is the default, or **Visible to the team** before you upload. You cannot change the choice later.
 To add an image while you write a reply, select the camera button beside **Send**. The image goes to the issue, not to the message. Its visibility is separate from the audience of the reply.
 Only the uploader can remove an image.
 
 If an upload fails, select **Try the upload again**. Select **Cancel upload** before you change the file or audience.
 If removal fails, select **Retry removal**.
-Rejected files exceed the [session limits](/guides/administration/#image-limits).
+Minsky rejects a file that exceeds the [image limits](/guides/administration/#set-image-limits).
 
 ## Report for a team
 
-Volunteers and specialists can select **Report for a team**, even when intake is closed.
-Select the team from the suggestions first.
+Staff can select **Report for a team**, even when intake is closed.
+Select the team from the suggestions first. You can add several teams. Minsky then creates one issue for each team.
 
-## See the calendar and confirm contest-wide awards
+## Confirm contest-wide awards
 
-Select **Account** and look under **Sessions** for the calendar. It lists the scheduled contests of your event for seven days, grouped by day in the event's time zone. A contest where you hold no seat shows "You have no seat here". Use **Open** to switch to a contest that you can open. Webmasters see every event.
+When the jury gives minutes to the whole contest, the card **Time awards to confirm** shows above the queue.
 
-When the jury gives minutes to the whole contest, the card **Time awards to confirm** shows above the queue. Apply the minutes in the external contest system first. Then select **Confirm applied externally**. Contestants' end times grow only by confirmed minutes.
+1. Apply the minutes in the external contest system.
+2. Select **Confirm applied externally**.
+
+Contestants' end times grow only by confirmed minutes.
+
+To see other contests of your event, read the [calendar](/guides/getting-started/#read-the-calendar).

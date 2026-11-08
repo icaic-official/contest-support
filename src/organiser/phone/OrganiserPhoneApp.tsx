@@ -80,7 +80,7 @@ function focusLater(id: string, fallback?: string) {
 }
 
 /**
- * The phone-first organiser app (mockup: design/redesign/e-organiser-phone.html).
+ * The phone-first organiser app.
  * Bottom tabs follow the person's combined roles. An issue opens as a
  * full-screen view over the tabs. The app stays mounted while the snapshot
  * is missing, so reply drafts and the chosen tab survive a refresh error.

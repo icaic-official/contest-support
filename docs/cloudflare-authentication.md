@@ -1,24 +1,21 @@
 # Cloudflare authentication reference
 
 The Cloudflare application uses maintained Better Auth identity operations and guarded D1 account records.
-Cloudflare serves the development application.
 This reference describes the authentication API and its access rules.
-Use the [installation guide](../site/src/content/docs/operators/installation.mdx) for setup and [run log](history/run-log.md) for dated verification evidence.
 
-The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, cryptographic components, limitations, and measured resource costs.
-The [verification guide](verify-cloudflare-authentication.md) gives exact test commands and fixture recovery steps.
+[Install on Cloudflare](../site/src/content/docs/operators/installation.mdx) gives the setup. The [identity choice](cloudflare-authentication-choice.md) explains Better Auth, its cryptographic components, its limits, and its measured costs. The [verification guide](verify-cloudflare-authentication.md) gives the test commands and fixture recovery steps.
 
 ## Adapter boundaries
 
-`AuthenticationService` defines the server interface without provider imports.
-`createAuthenticationHandler()` validates HTTP requests and calls that interface.
-`D1AuthenticationService` implements current access checks and atomic credential writes.
-`createBetterAuthIdentity()` uses Better Auth's server API for login, session verification, and logout.
-The raw Better Auth router is not exposed.
+| Component | Responsibility |
+| --- | --- |
+| `AuthenticationService` | The server interface, with `current`, `signIn`, `signOut`, and `changePassword`. It has no provider imports. |
+| `createAuthenticationHandler()` | Validates `/api/auth/` requests and calls that interface. |
+| `D1AuthenticationService` | Implements current access checks, sign-in limits, and the atomic password change. |
+| `createBetterAuthIdentity()` | Uses Better Auth's server API for login, session verification, and logout. The raw Better Auth router is not exposed. |
+| `D1ManageService.issueCredentials()` | Issues temporary passwords through `POST /api/credentials`. It is a management route, not part of this adapter. |
+| `createCloudflareAuthentication()` | Implements the browser `Authentication` contract. `createCloudflareBackend()` wraps it. |
 
-`createCloudflareAuthentication()` implements the existing browser `Authentication` contract.
-Organizers issue passwords through `POST /api/credentials` of the management routes, not through this adapter. The application route `GET /api/contests` is the only contest list.
-The complete `createCloudflareBackend()` factory wraps this authentication adapter and supplies the remaining operation groups.
 The backend entry point always creates the Cloudflare client. No provider fallback occurs.
 
 ## HTTP endpoints
@@ -29,17 +26,14 @@ Authenticated endpoints read the HttpOnly cookie. Request bodies cannot supply a
 | Method and path | Request | Result |
 | --- | --- | --- |
 | `POST /api/auth/sign-in` | `event`, `handle`, `password` | Sets the session cookie. Returns an empty object. `event` is the event code, or `null` for a site sign-in. |
-| `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. An absent or invalid login returns 401. |
+| `GET /api/auth/session` | Cookie | Returns `user`, `status`, and `csrf`. `status` holds `handle`, `must_change`, `session_valid`, and `can_change_handle`. An absent or invalid login returns 401. |
 | `POST /api/auth/sign-out` | Empty object | Revokes the login, deletes its identity session, and clears the cookie. |
 | `POST /api/auth/change-password` | `currentPassword`, `newPassword` | Changes the password and replaces the cookie. Revokes every earlier login. |
 
-The historical authentication Worker uses the session ID as its summary name.
-The complete application Worker routes session reads through the named application schema.
-Account creation and reset return `temporaryPassword` and `signIn` only in their authorized success response.
-`signIn` names the event code, or the site, that the account signs in with.
-A handle change is the `set_handle` command of `POST /api/manage`.
-No endpoint retrieves an earlier temporary password.
-Passwords and password hashes do not appear in audit records, responses for other actions, or application logs.
+`POST /api/auth/sign-in` returns 503 while the database holds no account, so public traffic cannot create rate-limit rows that fail the trusted bootstrap check.
+
+`POST /api/credentials` returns each temporary password once, in its authorized success response. No endpoint retrieves an earlier temporary password.
+Passwords and password hashes do not appear in audit records, in responses for other actions, or in application logs.
 
 Errors use fixed messages and these status codes:
 
@@ -47,7 +41,7 @@ Errors use fixed messages and these status codes:
 | --- | --- |
 | 400 | Invalid input or rejected current-password verification. |
 | 401 | Invalid credentials, expired login, revoked login, or restricted pending credentials. |
-| 403 | Mandatory password change, insufficient current permissions, archived account, or failed request protection. |
+| 403 | Mandatory password change, insufficient current permissions, archived event, or failed request protection. |
 | 409 | A guarded change failed or its commit outcome is unknown. Check account status before retrying. |
 | 429 | A failed-sign-in limit or the password-change limit was reached. Retry after the fixed window expires. |
 | 503 | Identity or database service is unavailable. A write response can have an unknown outcome. |
@@ -57,7 +51,7 @@ Errors use fixed messages and these status codes:
 Each account has two names:
 
 - The **handle** is the username that a person types. It is unique inside one event, or among site accounts. The screens call it the username.
-- The **login key** is the name that Better Auth knows, in `accounts.username` and `ba_user.username`. It is globally unique. Nobody types or sees it. A new account's login key is its ID without dashes. An account from before event sign-in keeps its old username as login key, and its handle starts equal to it.
+- The **login key** is the name that Better Auth knows, in `accounts.username` and `ba_user.username`. It is globally unique. Nobody types or sees it. A new account's login key is its ID without dashes.
 
 A sign-in names an event code and a handle. A webmaster belongs to no event, so a webmaster chooses **Site sign-in**, which names no event code.
 The server reads the account through the unique index of that namespace, and passes only the login key to Better Auth.
@@ -70,55 +64,59 @@ A wrong password for a real account still takes slightly longer, because Better 
 Handles contain 3 to 32 lowercase letters, digits, underscores, or hyphens.
 The first character must be a letter or digit. Sign-in trims spaces and normalizes letter case.
 `set_handle` changes only the handle. The password, the login key, and open sessions stay.
-An account of an event can change its own handle when it holds no team seat in any contest. A contestant account cannot, because venue staff read its handle from the credential sheet. A webmaster cannot, because a webmaster belongs to no event.
+An account of an event can change its own handle when it is not an entrant's sign-in and holds no team seat in any contest. A contestant account cannot, because venue staff read its handle from the credential sheet. A webmaster cannot, because a webmaster belongs to no event.
 `status.can_change_handle` in `GET /api/auth/session` reports this rule, so the account page shows the form only when `set_handle` accepts the change.
 After a handle change, staff in each contest that seats the account see the new handle at once. The account's other devices show it at their next account check, within about a minute.
-An account that the caller may manage can also get a new handle.
-An account without a login key gets one with its first temporary password.
-The synthetic identity email is not a mailbox. SMTP and personal email are unnecessary.
+The synthetic identity email, `<loginKey>@accounts.minsky.invalid`, is not a mailbox. SMTP and personal email are unnecessary.
 
 New passwords contain 12 to 128 characters.
 A password change requires the current password and a different password after Unicode NFKC normalization.
 NFKC converts equivalent Unicode forms to the same password input.
-Temporary passwords have 16 characters from a 56-character alphabet that omits 0, O, 1, l, I and o (about 93 random bits). A person can read one from paper.
+Temporary passwords have 16 characters from a 56-character alphabet that omits 0, O, 1, l, I and o, which gives about 93 random bits. A person can read one from paper.
 The credential dialog can print one sheet per person. The sheets exist only while the dialog is open.
-Passwords remain in request memory. Neither adapter saves plaintext credentials in browser storage.
+The browser adapter saves no password in browser storage.
 
 An account's application ID is also its Better Auth user ID.
 Credential changes retain memberships, team assignments, roles, permissions, issue actors, and history.
 Every protected operation checks current database state.
 Signed cookies, browser identity, and cached UI roles cannot grant contest access.
 
-Account creation requires current admin membership in the selected active contest session.
-A contestant account receives a team. A staff account receives roles, admin membership, or both.
-The team must belong to that session.
-Account-wide handle changes and resets by a contest admin require admin access to every contest session assigned to the target account. An event admin manages every other account of the event. A webmaster manages every other account.
-Any archived assigned event blocks those actions.
-Self-resets are rejected. An account holder uses `changePassword()` instead.
-Organizers verify the account holder's identity before issuing a recovery reset.
-They distribute the returned temporary password through an approved private channel.
-If that response is lost, another authorized reset replaces the unavailable credentials.
+Accounts come from management commands, and each new account has no password until an issue gives it one:
+
+- `create_people` creates staff accounts. `create_entrants` and `add_entrant_sign_in` create entrant sign-ins. Each needs an event admin of the event or a webmaster.
+- `create_event` creates the first event admin of a new event, and `add_webmaster` creates a webmaster. Each needs a webmaster.
+- Trusted bootstrap creates the first webmaster, with a temporary password, on an empty database.
+
+An issue of a password and another account's handle change follow one rule:
+
+- A webmaster manages every other account.
+- An event admin manages every other account of the event.
+- A contest admin manages an account that holds no grant, when the admin administers every contest that seats the account and the event is not archived.
+
+An archived event blocks those actions.
+Self-issues are rejected. An account holder uses `changePassword()` instead.
+A webmaster who lost access recovers through the trusted terminal command `npm run cloudflare:recover-admin`, which [Install on Cloudflare](../site/src/content/docs/operators/installation.mdx) describes.
 
 ## Session authority and browser protection
 
 Sessions last eight hours from login. Activity does not extend the lifetime.
 Hosted cookies use `__Host-minsky-session`, `Secure`, `HttpOnly`, `SameSite=Strict`, and `Path=/`.
 Cookies have no `Domain` attribute, so another hostname cannot receive the cookie.
-Local HTTP development uses `minsky-session` without `Secure`, restricted to loopback hosts.
-HTTPS browser tests use the hosted cookie settings.
+Local tests with `secureCookies: false` use `minsky-session` without `Secure`, restricted to loopback hosts. The Worker always uses the hosted settings.
 
 Better Auth reads the current D1 session without cookie caching or a secondary session store.
-Minsky also checks the approved login, expiry, revocation, credential generation, disabled flag, and pending credential state.
-Contest access additionally requires `must_change = 0` and current membership and permissions.
-The existing application store checks its approved login inside each guarded command batch.
+Minsky also checks the login, its expiry, its revocation, its credential generation, the disabled flag, and the pending credential state.
+Contest access additionally requires `must_change = 0` and a current seat or grant.
+The workflow, management, image, announcement, and avatar batches check the login again before they commit.
 
-Every request must target an explicitly configured origin.
+Every request must target the configured `AUTH_ORIGIN`.
 If an `Origin` header exists, it must match that exact origin.
 Every POST requires that origin header, `Content-Type: application/json`, and `X-Minsky-Request: 1`.
 Authenticated POST requests also require `X-CSRF-Token` from the current session response.
-The token prevents cross-site request forgery, where another site attempts an action with the user's cookie.
+The token prevents cross-site request forgery, where another site attempts an action with a person's cookie.
 POST requests with cross-site fetch metadata are rejected. No CORS access or preflight permission is exposed.
-Bodies are limited to 16 KiB. Redirected browser authentication requests fail.
+A sign-in without a `CF-Connecting-IP` header is rejected.
+Bodies on these routes are limited to 16 KiB. Redirected browser authentication requests fail.
 
 The browser adapter keeps the token from the last session read and reuses it for later mutations.
 The token belongs to one login. The adapter forgets it when a sign-in, sign-out or password change completes, and when a session read returns 401.
@@ -128,39 +126,36 @@ Callbacks run synchronously. Subscription cleanup is idempotent and stops later 
 Completed login, logout, and password-change requests invalidate earlier subscription reads, including reads started during the request.
 Polling affects UI awareness only. Server revocation takes effect on the next protected operation.
 
-Untrusted previews have no shared authentication binding or secret.
-The isolated authentication Worker disables preview URLs.
-Any later preview authentication needs its own origin, database, credentials, and fictional accounts.
+The application Worker configurations in `src/server/adapters/cloudflare/deploy/`, and the configuration that `npm run cloudflare:install` generates, set `preview_urls: false`. A Cloudflare version preview URL therefore does not reach those Workers.
+A preview with authentication needs its own origin, database, secret, and fictional accounts.
 
 ## Atomic credential changes and recovery
 
-Organizer resets first commit the mandatory-change gate, a new credential generation, revocations, and a pending audit operation together.
-The adapter then hashes the new password outside the database batch.
-Its final batch rechecks current organizer permissions and the pending operation ID.
-That batch writes the identity credential and completion record together. The temporary-password gate remains set.
-A superseded operation cannot replace a newer password.
-An account captured while credentials are pending cannot approve a login after the reset completes.
+An issue hashes each new password first, and then runs one guarded batch.
+The batch rechecks the caller's authority and each target's credential generation. It then revokes the earlier logins and identity sessions, writes the new credential, sets the mandatory-change gate, records the operation, and stores the receipt together.
+A hash failure or a rolled-back batch changes nothing, and the old password stays valid.
+A repeat with the same request ID returns the accounts with null passwords, because the server cannot retrieve a password. The organizer then issues again with a new request ID.
+Organizers verify the account holder's identity before they issue a recovery password, and they hand it over through a private channel.
 
-An interrupted create or reset leaves the account restricted.
-An authorized organizer can issue another reset. The new operation supersedes the earlier operation.
-A lost success response requires another reset because the server cannot retrieve the temporary password.
-An account whose initial identity creation failed retains its ID and membership during recovery.
+An account captured while credentials are pending cannot approve a login after the issue completes.
+A sign-in that races an issue cannot gain access, because only the credential generation captured before verification can approve the new identity session.
 
 Self password changes hash before their single guarded D1 batch.
 The batch verifies the original login and credential generation, updates credentials, clears the gate, and revokes all earlier sessions together.
-A hash failure or rejected atomic batch retains the earlier account state and login.
+A hash failure or rejected batch retains the earlier account state and login, so a sole organizer can retry an interrupted temporary-password change.
 A lost database response can leave the commit outcome unknown and earlier logins revoked.
-This lets a sole organizer retry an interrupted temporary-password change.
 A committed change with a lost response allows login with the new password. Try that password before requesting recovery.
 The browser receives a fresh session only after the credential commit.
-The final self-change guard retains both original session deadlines while the batch deliberately revokes and deletes the old sessions.
+The final self-change guard retains both original session deadlines while the batch revokes and deletes the old sessions.
 Login creation also rechecks the captured credential generation and both current session expiries before completion.
 In the same batch, it checks that no event deletion has fenced the account's event. A sign-in or a password change that ends after the fence gets 409 and no login.
 
 Scheduled maintenance removes password-attempt counters and expired login records after a one-day retention period.
-The application Worker runs it every minute. The isolated authentication CI Worker runs it daily.
-Sign-in limits count failed sign-ins only. A successful sign-in never counts toward any limit.
-The owner chose this policy on 2026-10-25, because all users at a venue can share one public IP address.
+The application Worker runs it every minute. The maintainer-only authentication CI Worker runs it daily.
+
+## Sign-in limits
+
+Sign-in limits count failed sign-ins only. A successful sign-in never counts toward any limit, because all people at a venue can share one public IP address.
 Each limit uses a fixed 15-minute window that starts at its first failure:
 
 | Limit | Maximum failures | Effect at the maximum |
@@ -173,9 +168,9 @@ A refused attempt does not add to a counter and does not extend the window.
 Requests that pass the check at the same time can all fail, so a count can pass its maximum.
 The excess is at most the number of requests in flight when the count reaches the maximum.
 The constants are in `signInFailureLimits` in `src/server/adapters/cloudflare/authentication.ts`.
-The hosted Worker stores a secret-salted IP digest rather than the address.
+The Worker stores a secret-salted IP digest rather than the address.
 One person who sends many failures can still lock one handle of one event for the rest of its window.
-A person at a shared address needs more than 200 failures in 15 minutes to block that address.
+A shared address is blocked only after 200 failures in 15 minutes.
 
 Self password verification uses a separate ten-attempt account window. Every request counts, so this limit does not depend on the outcome.
 The replacement login after an authenticated password change does not count toward any sign-in limit.

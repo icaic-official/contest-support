@@ -1,170 +1,103 @@
 # Cloudflare authentication choice
 
-This page explains the identity choice for T0018.
-Cloudflare serves the development application through the complete connector.
-The complete connector, fresh installations, and approved stable deployment have separate [verification records](history/run-log.md).
-The [activation procedure](activate-cloudflare-development.md) records the separate owner approval and recovery rules.
+This page explains why Minsky uses Better Auth, and what that design costs.
+The [authentication reference](cloudflare-authentication.md) defines the behavior.
 
 Better Auth is a free library under the [MIT licence](https://github.com/better-auth/better-auth/blob/main/LICENSE.md).
-Minsky runs it inside its own Worker with D1. This implementation requires no Better Auth subscription or hosted account.
-Cloudflare hosting has separate charges. The [resource and cost evidence](#resource-evidence-and-deployment-cost) explains the Workers Paid requirement.
+Minsky runs it inside its own Worker with D1, so it needs no Better Auth subscription or hosted account.
+Cloudflare hosting has separate charges. Password hashing is the reason that Minsky needs Workers Paid, as the [resource evidence](#resource-evidence-and-deployment-cost) shows.
 
 ## Use Better Auth behind the identity adapter
 
-T0018 selected Better Auth `1.7.10`. `package.json` and `package-lock.json` pin the current exact version.
-The package supplies username login, password verification, signed session cookies, database sessions, expiry, and logout.
-Its username plugin permits username login while its user schema retains an email field.
-Minsky uses a synthetic address under `accounts.minsky.invalid` for that required field.
-Personal email addresses and SMTP are not required.
-See [the username plugin](https://better-auth.com/docs/plugins/username).
+Minsky needs organizer-issued usernames and passwords on Workers and D1, with no email.
+Better Auth supplies username login, password verification, signed session cookies, database sessions, expiry, and logout. `package.json` pins its exact version.
+[The username plugin](https://better-auth.com/docs/plugins/username) permits username login while its user schema keeps an email field. Minsky puts a synthetic address under `accounts.minsky.invalid` in that field, so personal email addresses and SMTP are not required.
 
-This fits the required organizer-issued usernames and passwords on Workers and D1.
-Maintained password verification and session cookies reduce the authentication code Minsky must own.
-The main tradeoff is database-schema coupling for Minsky's guarded credential operations, described below.
+Maintained password verification and session cookies reduce the authentication code that Minsky must own.
+The main cost is coupling to Better Auth's database schema, which the next section describes.
 This choice does not establish that Better Auth is the best option for every deployment.
 
 The server adapter exposes three operations: `signIn()`, `session()`, and `signOut()`.
-The Worker does not expose Better Auth's HTTP router.
-The Minsky HTTP handlers enforce request origins, request-forgery protection, and account permissions.
+The Worker does not expose Better Auth's HTTP router. Minsky's own handlers enforce request origins, request-forgery protection, and account permissions.
 Public registration, email recovery, external identity providers, and automatic account linking are disabled or unreachable.
+
+Better Auth knows only the login key, which nobody types. A person types a handle, and Minsky resolves it to the login key. A handle change therefore never touches Better Auth, and open sessions continue.
 
 ## Keep account policy and credential writes in D1
 
-Better Auth does not supply Minsky's cross-session reset rules or mandatory password-change gate.
-Minsky checks current account status and memberships before contest access and account administration.
-The account ID remains the Better Auth user ID.
-Memberships and history retain that ID.
+Better Auth does not supply Minsky's rules for who may reset whom, or the mandatory password change.
+Minsky checks current account status and seats before contest access and account administration.
+The account ID is also the Better Auth user ID, so memberships and history keep that ID.
 
-Better Auth documents weaker reset behavior when database transactions are unavailable.
-D1 has no interactive transaction support for its default reset path.
-Therefore, Minsky does not call that reset endpoint.
-See [Better Auth password resets](https://better-auth.com/docs/authentication/email-password#revoking-sessions-on-password-reset).
+Better Auth [documents weaker reset behavior](https://better-auth.com/docs/authentication/email-password#revoking-sessions-on-password-reset) when database transactions are unavailable, and D1 has no interactive transactions.
+Minsky therefore does not call that reset endpoint. It hashes the new password first, and then writes the credential, revokes the earlier sessions, and sets the mandatory-change gate in one guarded D1 batch.
+An interrupted issue leaves the old password valid, because the batch either commits whole or changes nothing. A self-service password change works the same way, so a hashing failure leaves the current password and login available for another attempt.
 
-Minsky first restricts the account and revokes its existing sessions in a guarded D1 batch.
-Password hashing occurs outside the batch.
-A second guarded batch writes the new credential and completes the reset operation together.
-The operation identifier prevents an older interrupted operation from replacing a newer password.
-An interrupted update leaves the account restricted for organizer-assisted recovery.
-For a self-service password change, hashing occurs before one guarded commit.
-That commit changes the password and revokes earlier sessions together.
-A hashing failure therefore leaves the current password and login available for another attempt.
+This approach couples the adapter to Better Auth's stored schema. Migration `0004_identity.sql` owns the `ba_user`, `ba_account`, `ba_session`, and `ba_verification` tables, and Minsky writes to them directly.
+Each Better Auth upgrade therefore needs a comparison of the schema and the credential format, and a new run of the [local and hosted authentication checks](verify-cloudflare-authentication.md).
 
-This approach couples the adapter to Better Auth's stored schema.
-Migration `0004_identity.sql` owns the `ba_user`, `ba_account`, `ba_session`, and `ba_verification` tables.
-Better Auth's SQLite adapter stores dates as ISO 8601 text.
-Better Auth can check its expected tables against the database before each request.
-The Worker turns that check off.
-With the check on, each request ran about 40 D1 queries instead of 4.
-The migrations own the schema instead.
-`identityStatements.test.ts` runs the real check against the migrated local D1 database.
-It fails when an upgrade expects a table or column that the migrations lack.
-It also fails when an authenticated API request sends the check's queries again.
-Before upgrading Better Auth, compare its schema and credential format, then rerun local and hosted authentication checks.
+Better Auth can check its expected tables against the database before each request, and the Worker turns that check off.
+In a hosted load test on 2026-10-25, each Worker request ran about 40 D1 queries with the check on. A prototype with the check off ran about 4. The [scaling design](scaling-design.md#d1-ran-about-40-queries-for-each-request) holds the numbers.
+The migrations own the schema instead. `identityStatements.test.ts` runs the real check against the migrated local D1 database. It fails when an upgrade expects a table or column that the migrations lack, and when an authenticated API request sends the check's queries again.
 
-The Worker reuses one Better Auth instance for each D1 binding, origin, and secret.
-Building an instance takes about 17 ms of CPU.
-The instance keeps no session state, so reuse is safe.
-A new secret builds a new instance, and cookies from the old secret stop working.
+The Worker reuses one Better Auth instance for each D1 binding, origin, and secret. Building an instance took about 17 ms of CPU when measured on 2026-10-25.
+The instance keeps no session state, so reuse is safe. A new secret builds a new instance, and cookies from the old secret stop working.
 
 ## Retain maintained cryptographic components
 
-`password.ts` uses the exported `better-auth/crypto` password functions.
-Both Better Auth login and Minsky credential writes use those functions.
-The locked `@better-auth/utils` version is `0.5.0`.
-Its `workerd` export selects native `node:crypto` scrypt.
-The parameters are `N=16384`, `r=16`, `p=1`, and a 64-byte derived key.
-The implementation uses a random 16-byte salt and Unicode NFKC normalization.
-It sets a 64 MiB calculation limit.
-See [the maintained implementation](https://github.com/better-auth/utils/blob/main/src/password.node.ts).
+`password.ts` uses the exported `better-auth/crypto` password functions, so Better Auth login and Minsky credential writes share one format.
+The locked `@better-auth/utils` version is `0.5.0`. Its `workerd` export selects native `node:crypto` scrypt, which [the maintained implementation](https://github.com/better-auth/utils/blob/main/src/password.node.ts) configures this way:
+
+- `N=16384`, `r=16`, `p=1`, and a 64-byte derived key.
+- A random 16-byte salt and Unicode NFKC normalization.
+- A calculation limit of 64 MiB.
+
+[Workers supports `node:crypto`](https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/), with specific exceptions that include Argon2.
+Minsky keeps scrypt's maintained parameters and pays for the CPU time. A smaller password cost to fit a smaller CPU allowance would be the wrong trade for a system that holds real accounts.
 
 Session secrets and temporary passwords use Web Crypto randomness.
-The browser receives the session credential only through an HttpOnly cookie.
-The server stores the credential hash rather than the plaintext password.
-Better Auth logging is disabled because provider errors can contain bound values.
-
-Workers supports `node:crypto`, with specific exceptions that include Argon2.
-Minsky keeps scrypt's maintained parameters rather than reducing password cost to fit a smaller CPU allowance.
-See [Workers crypto support](https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/).
+The browser receives the session credential only through an HttpOnly cookie, and the server stores only the password hash.
+Better Auth logging is disabled, because provider errors can contain bound values.
 
 ## Bound browser sessions explicitly
 
-Minsky uses these settings instead of Better Auth's default lifetime and cookie cache:
+Minsky replaces Better Auth's default lifetime and cookie cache. A session lasts eight hours from login, with no automatic extension, and every check reads the D1 primary.
+A person therefore signs in again during a long day, and each request pays for the reads. An authenticated request made 3 D1 calls before its handler in the [local measurement in the scaling design](scaling-design.md#d1-ran-about-40-queries-for-each-request). In return, a revocation takes effect on the next protected operation, with no cached session to outlive it.
 
-| Setting | Value |
-| --- | --- |
-| Lifetime | Eight hours from login, without automatic extension. |
-| Session authority | D1 primary reads. No cookie cache or secondary session store. |
-| Hosted cookie | `__Host-minsky-session`, `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, without `Domain`. |
-| Local HTTP cookie | `minsky-session`, `HttpOnly`, `SameSite=Strict`, `Path=/`, restricted to loopback. |
-| Permitted origin | One configured exact origin. No wildcard preview origins. |
-| Browser password storage | Passwords stay in request memory. No local storage or bearer token export. |
-
-The identity cookie proves the Better Auth session.
-Each protected operation also checks the current Minsky login, credential generation, account gate, and permissions.
-Password changes and resets revoke previous sessions.
-An identity login that races a password reset cannot gain access through an older credential generation.
+The identity cookie proves the Better Auth session. Each protected operation also checks the current Minsky login, credential generation, account gate, and permissions.
+Password changes and resets revoke previous sessions. An identity login that races a password reset cannot gain access through an older credential generation.
 See [Better Auth security settings](https://better-auth.com/docs/reference/security).
-
-Untrusted previews must use isolated fictional data and a separate authentication deployment.
 
 ## Resource evidence and deployment cost
 
-A local Node.js sample measured about 78 ms for hashing and 68 ms for verification.
-These measurements are elapsed time on one development machine.
-They do not measure hosted Worker CPU use or concurrency capacity.
+Password hashing is the most expensive thing that the Worker does, and it decides the Cloudflare plan.
+These measurements are from 2026-10-18. They are small samples. They establish a resource requirement, not capacity or a latency guarantee.
 
-On 2026-10-18 SGT, five local workerd samples measured 56 to 62 ms for hashing and 52 to 61 ms for verification.
-All ten requests succeeded.
-Hosted verification succeeded in five requests.
-An adaptive analytics sample recorded 66.425 ms of CPU for verification.
-An initial hosted hash sample recorded 75.577 ms of CPU.
-A separate hash run recorded a median of 96.311 ms and a 99th percentile of 196.446 ms across two sampled requests.
-That run completed four hash requests and observed one transient deployment-propagation 404.
-These small samples establish a resource requirement. They do not establish capacity or a latency guarantee.
-The temporary benchmark Workers had no database binding and were deleted after measurement.
-No paid upgrade occurred.
+| Measurement | Result |
+| --- | --- |
+| Local Node.js, elapsed time | About 78 ms to hash and 68 ms to verify |
+| Local `workerd`, five samples of each, elapsed time | 56 to 62 ms to hash and 52 to 61 ms to verify |
+| Hosted Worker, one verification sample, CPU | 66.425 ms |
+| Hosted Worker, one hash sample, CPU | 75.577 ms |
+| Hosted Worker, separate hash run with two sampled requests, CPU | 96.311 ms median and 196.446 ms 99th percentile |
+| Hosted password change on the Free plan, CPU | 252.901 ms, ended by Cloudflare with `exceededResources` |
 
-The runner is `node scripts/auth-hash-benchmark.mjs` for local workerd.
-Hosted runs require `--hosted`, `--operation=hash` or `--operation=verify`, and the explicit authorized `--account` value.
-The runner checks existing Wrangler access, creates one temporary Worker, and deletes that Worker afterward.
-It keeps fictional credentials in memory and suppresses provider output.
-It reads existing OAuth credentials only to request CPU analytics.
-No account, password hash, or session token is written to its output.
-Hosted CPU comes from [the GraphQL analytics API](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-workers-metrics/).
-Hosted request timers cannot reliably measure CPU execution.
+The hosted samples used temporary Workers with no database binding, and adaptive analytics supplied the CPU values. Local elapsed time and hosted request timers do not measure hosted CPU.
+The failed password change reported 16,724,317 bytes in adaptive memory metrics, which does not establish peak native memory use. [Cloudflare's resource status](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/) can include CPU and other runtime limits.
+One password change verifies the current password, hashes the new one, and verifies it again at the replacement login, so one request does three scrypt calculations (inferred from `changePassword()`).
 
-The Workers Free plan permits 10 ms of CPU per request and 128 MB of memory per isolate.
-The observed CPU samples exceed the Free plan's 10 ms limit.
-Successful fixture requests do not establish reliable Free-plan operation.
-The documented Standard plan costs at least US$5 per month.
-It includes ten million requests and thirty million CPU milliseconds per month.
-Additional usage costs US$0.30 per million requests and US$0.02 per million CPU milliseconds.
+On that date, the Workers Free plan permitted 10 ms of CPU per request and 128 MB of memory per isolate. The samples exceed that CPU limit, so a successful fixture request does not establish reliable Free-plan operation.
+
+The application Worker configurations in `src/server/adapters/cloudflare/deploy/`, the configuration that `npm run cloudflare:install` generates, and `wrangler.auth-ci.jsonc` therefore request `limits.cpu_ms = 1000`. That setting needs a paid plan. On the Free plan, Cloudflare rejected the setting with error `100328`, and the prior Worker stayed active.
+Workers Paid accepted the cap for the isolated authentication Worker on 2026-10-18. Its hosted HTTP suite then passed, including password change and organizer-assisted recovery, with the password parameters unchanged.
+
+On 2026-10-18, Cloudflare listed these Standard plan prices. Check [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [pricing](https://developers.cloudflare.com/workers/platform/pricing/) for current values:
+
+- At least US$5 per month, with ten million requests and thirty million CPU milliseconds included.
+- US$0.30 per million additional requests.
+- US$0.02 per million additional CPU milliseconds.
+
 For example, 100,000 password checks at 100 ms each consume ten million CPU milliseconds before other application work.
-These figures explain the concrete need and cost before a possible upgrade.
-No upgrade is part of the benchmark runner.
-See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [pricing](https://developers.cloudflare.com/workers/platform/pricing/).
+The CPU cost also limits one request. `POST /api/credentials` takes at most eight accounts, because each password hash costs Worker CPU time.
 
-
-### Protected HTTP resource rejection
-
-Protected run `39049037968` passed all 28 hosted D1 account cases on `8cfd7a5`.
-Cloudflare then terminated one password-change invocation with `exceededResources` at 252.901 ms CPU.
-The invocation reported 16,724,317 bytes in adaptive memory metrics. This does not establish peak native memory use.
-Cloudflare's resource status can include CPU and other runtime limits.
-See [the invocation status reference](https://developers.cloudflare.com/workers/observability/metrics-and-analytics/).
-
-A subsequent deployment requested `limits.cpu_ms = 1000` for the isolated authentication Worker.
-Cloudflare rejected that setting with error `100328`: CPU settings require a paid plan, and this account uses Free.
-The rejected deployment left the prior Worker active.
-The owner selected subscription activation later. No paid upgrade occurred.
-The committed configuration retains the bounded CPU setting for verification after activation.
-The earlier successful HTTP runs do not establish dependable operation on Free.
-
-### Paid verification after PR #41 review
-
-During PR #41 review, the owner activated Workers Paid and requested completion of hosted verification.
-The isolated `minsky-auth-ci` Worker then accepted the 1,000 ms cap.
-The maintained password parameters remain unchanged.
-The local hosted HTTP suite passes on implementation `7abaf2e`, including password change and organizer-assisted recovery.
-Protected [run 39089988536](https://github.com/GiftedNovaHD/minsky/actions/runs/39089988536) also passes all 30 account cases and the complete HTTP case on merged `main`.
-See [run log](history/run-log.md) for exact deployment versions and separate protected GitHub evidence.
+[Measure password cost](verify-cloudflare-authentication.md#measure-password-cost) gives the commands that repeat these measurements.

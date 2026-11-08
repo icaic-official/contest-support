@@ -121,4 +121,4 @@ If a deletion shows **Stopped**, read [the operator steps for a stopped deletion
 ## Recover webmaster access
 
 If you forget your password, ask another webmaster to reset it on the **Site** page.
-If no webmaster can sign in, an operator runs `npm run cloudflare:recover-admin`. See [Recover the webmaster](/operators/installation/#recover-the-webmaster).
+If no webmaster can sign in, an operator runs `npm run cloudflare:recover-admin`. See [Recover the webmaster](/operators/installation/#recover-a-webmaster-password).

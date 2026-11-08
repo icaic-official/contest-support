@@ -4,7 +4,7 @@ import { appErrors } from "./support/worker";
 import { atPath } from "./support/address";
 import { expect, test } from "./support/localWorker";
 
-// T0009 jury worklist checks for the T0015 organiser UIs. The phone Awards
+// Jury worklist checks for the organiser UIs. The phone Awards
 // tab (390 × 844) and the desktop Award review page (1280 × 800) are the
 // worklist: "To decide" is the old "Needs decision" list and "To apply" is
 // the old "Pending external application" list.
@@ -179,7 +179,7 @@ test("lists outstanding work across queue filters and keeps the filters after re
   expect(await issueNumbers(page, "Applied")).toEqual(["ISS-5"]);
   await expect(row(page, 5)).toContainText("Applied externally");
 
-  // T0015 has no "Back to jury worklist" button. Closing the side sheet
+  // The organiser UIs have no "Back to jury worklist" button. Closing the side sheet
   // returns focus to the award card button that opened it.
   await showList(page, "To apply");
   const target = page.getByRole("button", {

@@ -109,8 +109,7 @@ function SessionAdminScope({
 }
 
 /**
- * The organiser desktop console for laptops and tablets
- * (mockup: design/redesign/a-console.html). A collapsible sidebar holds the
+ * The organiser desktop console for laptops and tablets. A collapsible sidebar holds the
  * session switcher, the pages for the person's combined roles, the intake
  * switch for admins and the person card, which opens the account page. The
  * top bar has the breadcrumb, the ⌘K command palette, Live or Reconnecting

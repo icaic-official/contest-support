@@ -1,208 +1,200 @@
 # Backend contracts
 
-The browser uses `Backend` in [contracts.ts](../src/backend/contracts.ts) for accounts, workflows, administration, images, announcements, avatars, and live updates.
-An adapter implements those operations for a provider.
-Cloudflare is the only implementation. The contract stays so that a later provider can implement it.
-See [run log](history/run-log.md) for source-specific verification and deployment limits.
+`Backend` in [contracts.ts](../src/backend/contracts.ts) is the interface between the browser application and the server.
+It describes Minsky operations. It does not expose database queries, access tokens, provider clients, or channel objects.
 
-The contracts describe Minsky operations.
-They do not expose database queries, access tokens, provider clients, or channel objects.
-The server still checks permissions and applies each workflow command as a transaction.
-A transaction commits all changes for a command together, or commits none.
-For implementation and registration steps, use [Add a backend provider](add-provider.md).
-The [frontend architecture](frontend-architecture.md) describes the application shell, feature modules, and browser routes that use these contracts.
+Cloudflare is the only implementation. [createCloudflareBackend()](../src/backend/cloudflare/backend.ts) implements every group through same-origin HTTP, cookies, and WebSockets. The tables below name its routes.
+Identifiers in the contract call a contest a session, so a `sessionId` is a contest ID.
 
-## Shared server workflow
+[Cloudflare backend design](cloudflare-backend-design.md) explains the server. [Server workflow reference](server-workflow.md) defines the issue commands. [Add a backend provider](add-provider.md) lists the steps for another implementation. [Frontend architecture](frontend-architecture.md) describes the callers.
 
-[WorkflowService](../src/server/workflow.ts) applies all nine existing issue commands.
-The service validates input, applies the existing decisions, handles receipts, and bounds conflict retries.
-`WorkflowPersistence` supplies authorized reads and guarded atomic commits.
-Its operation-level methods expose no SQL or generic transaction callback.
-The [workflow reference](server-workflow.md) records the compatibility baseline and each responsibility.
+## Groups
 
-The Cloudflare application executes workflow commands through the shared service and guarded D1 batches.
-Issue decisions use one shared service. Other operations remain inside their provider implementations.
+| Group | Interface | Operations |
+| --- | --- | --- |
+| `auth` | `Authentication` | Sign-in, sign-out, account status, and password change. |
+| `workflows` | `Workflows` | Contest list, contest snapshot, and issue commands. |
+| `manage` | `Management` | Site and event administration, and temporary passwords. |
+| `contestAwards` | `ContestAwards` | Time awards for a whole contest. |
+| `images` | `ImageTransport` | Issue images. |
+| `announcements` | `Announcements` | Contest announcements and their images. |
+| `avatars` | `Avatars` | Profile pictures. |
+| `updates` | `LiveUpdates` | Live change hints. |
 
-## Complete Cloudflare implementation
+## Rules for every request
 
-[createCloudflareBackend()](../src/backend/cloudflare/backend.ts) implements the complete browser contract through same-origin HTTP and cookies.
-[applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) serves the application and its API.
-The Worker obtains `Caller` from the maintained identity service. Request bodies cannot supply that identity.
-Mutation routes check the exact origin, current session, and request-protection token.
-JSON bodies are limited to 16 KiB, except announcement text, which allows 64 KiB. Image transfers require an exact length and an R2-verified SHA-256 checksum. An avatar transfer has at most 256 KiB.
+The server checks permissions and commits each command as a unit. A browser check only decides which controls to show.
 
-The [D1 store](../src/server/adapters/d1/store.ts) persists all nine `WorkflowService` commands.
-Its batches recheck credentials, generation, identity-session expiry, application-login expiry, current permissions, and captured state.
-One database timestamp supplies each workflow commit's ledger and history records.
-State, receipts, history, resolutions, awards, and audience notifications commit together.
-The complete schema adds migrations `0005` through `0016` to the authentication foundation.
+- The Worker gets `Caller` from the identity service. A request body cannot supply it.
+- An account with a temporary password receives 403 on every route outside `/api/auth/`.
+- A `POST` or `PUT` needs the exact origin, `X-Minsky-Request: 1`, and the current `X-CSRF-Token`.
+- A JSON body holds at most 16 KiB. `POST /api/announcements` allows 64 KiB, and `POST /api/manage` allows 128 KiB.
+- An image transfer needs an exact `Content-Length` and the SHA-256 digest in `X-Minsky-Digest`. R2 verifies the digest. An avatar transfer holds at most 256 KiB.
+- A request ID identifies one attempted action, including its retries. A repeat with the same content does not repeat the write. A repeat with other content is rejected.
 
-[D1ApplicationService](../src/server/adapters/cloudflare/application.ts) returns each authorized snapshot in one database statement.
-Migration `0012` indexes `history(issue_id, at)`.
-Migration `0013` indexes `memberships(account_id, session_id)` and `issues(session_id, team_id)`.
-The snapshot reads the caller's access row once in each section.
-It finds a contestant's issues through the team index, and the contestant's team by its key.
-It reads images from the visible issues, not from every image in the database.
-It reads the member list and the audit entries only for an administrator.
-The read volume test session has 1,200 accounts, 100 issues and 1,200 audit entries.
-On 2026-10-26 a snapshot of that session read 122 rows for a contestant, 2,801 for a volunteer and 6,487 for an administrator (measured).
-The sessions list read 7 rows, where it read 1,205 before.
-[The query plan test](../src/server/adapters/d1/queryPlans.test.ts) fails if a snapshot query scans a table or loses these indexes.
-[The read volume test](../src/server/adapters/d1/readVolume.test.ts) fails if the rows read on that session grow again.
-The every-minute cron job also reads by state and expiry.
-Migration `0015` indexes the pending, expired, and removed rows of `issue_images` and `announcement_images`, `logins(expires_at)`, and `ba_session(expiresAt)`.
-Before it, one cron tick read 7,880 rows on a session with 1,200 accounts and 100 issues. Now it reads 24, which includes the 3 rows of the notification claim (measured with `npm run perf:reads`).
-[The cron read test](../src/server/adapters/d1/cronReads.test.ts) fails if a cron statement scans a table or reads more rows than the work needs.
-It allows one scan, of the password-attempt counters, which hold one row for each failed sign-in key of the last day.
-Migration `0016` adds the partial index `memberships_staff`, which holds the memberships with no team. The avatar list of a staff member reads it, and `readVolume.test.ts` fails if that list reads the whole session again.
-Snapshots preserve names, timestamps, history, awards, image metadata, limits, and administrator records.
-A valid login with removed membership receives an empty snapshot with null membership.
-An invalid login cannot authorize that read.
-Administration batches recheck current access and protect the last administrator.
-
-[R2ImageService](../src/server/adapters/cloudflare/images.ts) owns immutable reservations, private transfers, completion, and deletion recovery.
-Reservations count toward concurrent quotas. Completion rechecks current access and limits.
-Downloads check access again after the storage read.
-Deletion tasks retain exact object keys after successful cleanup, so recovery can remove a late interrupted transfer.
-
-[SessionLiveCoordinator](../src/server/adapters/cloudflare/live.ts) delivers only `ready` and `change` hints.
-It rechecks current permissions before each delivery and closes expired or revoked connections.
-Persisted audience cursors suppress old duplicate delivery. A reconnect signals a fresh authorized snapshot.
-The outbox remains pending until the coordinator accepts delivery. Minutely maintenance retries delivery and image cleanup.
-
-Provider-owned [installation tooling](../src/server/adapters/cloudflare/tooling/install.mjs) checks exact targets and protects returned credentials.
-See [installation](../site/src/content/docs/operators/installation.mdx), [provider verification](run-provider-tests.md), and [current evidence](history/run-log.md).
-
-## Module boundaries
-
-| Module | Responsibility |
-| --- | --- |
-| [contracts.ts](../src/backend/contracts.ts) | Defines `Backend` and each group of operations. |
-| [errors.ts](../src/backend/errors.ts) | Defines workflow rejection, announcement rejection, and image retry errors. |
-| [index.ts](../src/backend/index.ts) | Creates the backend from public configuration. |
-| [cloudflare/backend.ts](../src/backend/cloudflare/backend.ts) | Calls the same-origin API and manages independent live connections. |
-| [server/adapters/cloudflare/applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) | Constructs Cloudflare services and handles application and maintenance requests. |
-| [server/adapters/cloudflare/application.ts](../src/server/adapters/cloudflare/application.ts) | Reads authorized snapshots and commits guarded administration changes. |
-| [server/adapters/cloudflare/announcements.ts](../src/server/adapters/cloudflare/announcements.ts) | Reads announcement snapshots and commits guarded announcement commands. |
-| [server/adapters/cloudflare/announcementImages.ts](../src/server/adapters/cloudflare/announcementImages.ts) | Manages private announcement image reservations, transfers, publication, and cleanup. |
-| [server/adapters/cloudflare/avatars.ts](../src/server/adapters/cloudflare/avatars.ts) | Stores, lists, reads, and removes account avatars, and retries their file cleanup. |
-| [server/adapters/cloudflare/images.ts](../src/server/adapters/cloudflare/images.ts) | Manages private image reservations, transfers, publication, and cleanup. |
-| [server/adapters/cloudflare/live.ts](../src/server/adapters/cloudflare/live.ts) | Delivers audience-specific invalidations and manages current connection access. |
-| [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
-| [model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
-| [imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification shared with the attachment function. |
-
-The UI imports the contracts and `backend`.
-ESLint restricts provider SDKs, browser implementations, and server adapters in shared application code.
-The UI can import the contracts, shared errors, and `backend` client.
-The same provider pattern protects shared server rules and test scenarios.
-ESLint checks static imports, re-exports, and literal dynamic UI imports.
-ESLint rejects computed dynamic UI paths because it cannot determine their provider.
-Provider modules and the backend registration file retain access to their implementation dependencies.
-The complete browser adapter has a provider-owned fixture driver.
-
-`Backend` defines behavior without requiring a distinct browser transport for every hosting provider.
-The current Cloudflare browser transport uses HTTP, cookies, and WebSockets without Cloudflare SDKs.
-A server with that same protocol can reuse it. Different protocols can implement `Backend` directly.
-Deployment bindings and provider secrets remain outside the shared application contracts.
-AWS, GCP, and Azure have no implementation or verified installation path.
-
-The Cloudflare adapter calls the same origin.
-There is no automatic fallback between providers.
+The [authentication reference](cloudflare-authentication.md) defines the rules for `/api/auth/` routes.
 
 ## Authentication
 
-`Backend.auth` exposes these operations.
+| Operation | Route | Result |
+| --- | --- | --- |
+| `currentUser()` | `GET /api/auth/session` | Returns `AccountIdentity` or `undefined`. The identity contains `id`, optional `email`, and optional `name`. |
+| `subscribe(onChange)` | `GET /api/auth/session` | Reports the current account when authentication changes. Reports `undefined` after sign-out. Returns a cleanup function. |
+| `signIn(target, handle, password)` | `POST /api/auth/sign-in` | Signs in. `target` is `{ kind: 'event', code }` or `{ kind: 'site' }`. A wrong event code, handle, or password gives the same refusal. |
+| `signOut()` | `POST /api/auth/sign-out` | Ends the login. |
+| `accountStatus()` | `GET /api/auth/session` | Returns `handle`, `must_change`, `session_valid`, and `can_change_handle`. |
+| `changePassword(currentPassword, newPassword)` | `POST /api/auth/change-password` | Resolves only after the password changes and the temporary-password gate clears. |
 
-| Operation | Result |
-| --- | --- |
-| `currentUser()` | Returns `AccountIdentity` or `undefined`. The identity contains `id`, optional `email`, and optional `name`. |
-| `subscribe(onChange)` | Reports the current account when authentication changes. Reports `undefined` after sign-out. Returns a cleanup function. |
-| `signIn(username, password)` | Signs in with organizer credentials. |
-| `signOut()` | Ends the login through the provider. |
-| `accountStatus()` | Returns `username`, `must_change`, and `session_valid`. |
-| `changePassword(currentPassword, newPassword)` | Updates the password, then completes the mandatory-password check. Resolves only when both operations succeed. |
+`currentUser()` restores the browser's login state. Its result does not grant access to contest data.
+After a reset removes the identity session, `accountStatus()` returns a restricted status with no account identity.
 
-`currentUser()` restores the browser's login state.
-Its result does not grant access to contest data.
-Server checks enforce password changes, revoked logins, session membership, and roles.
+Subscriptions read the session every 60 seconds, on window focus, and on page restoration. They invoke callbacks synchronously.
+The cleanup function can run more than once. No callback runs after cleanup returns.
 
-Authentication subscriptions invoke callbacks synchronously.
-Their cleanup function can run more than once.
-No callback runs after cleanup returns.
+## Contests and workflow commands
 
-The Cloudflare adapter implements this same authentication contract through same-origin HTTP and HttpOnly cookies.
-Password changes return a fresh session after the atomic credential commit. All earlier sessions are revoked.
-The complete browser factory supplies the other `Backend` groups.
-After a reset removes an identity session, `accountStatus()` returns a restricted status with no account identity.
-See the [authentication reference](cloudflare-authentication.md) for current checks, endpoints, expiry, and request protection.
+| Operation | Route | Result |
+| --- | --- | --- |
+| `contests(query?)` | `GET /api/contests` | Returns a `ContestSummary` for each contest that the query selects. |
+| `snapshot(sessionId)` | `GET /api/snapshot` | Returns a validated `Snapshot`. |
+| `execute(sessionId, requestId, command)` | `POST /api/workflow` | Runs one `Command` and returns the issue ID. |
+| `executeAndRead(sessionId, requestId, command)` | `POST /api/workflow` | Optional. Follows the rules of `execute`, and also returns the snapshot that the server read right after the commit. |
 
-## Session reads and workflow commands
+`contests()` accepts one of these query forms:
 
-`Backend.workflows.sessions(userId)` returns the account's accessible session IDs and names.
-The authenticated caller determines access at the server.
-The supplied `userId` does not confer access to another account.
+- No query selects every contest that the caller can open. An account of an event reaches only that event. A webmaster reaches every event.
+- `{ eventId }` narrows that list to one event.
+- `{ window: { from, to } }` selects scheduled contests that overlap a window of at most 92 days, with at most 500 rows. It lists every contest of the caller's event. A webmaster gets every event. `canOpen` is false for a contest that the caller cannot open.
 
-`snapshot(sessionId)` returns a validated `Snapshot`.
-The snapshot includes permitted issues, history, resolutions, awards, image records, members, limits, and server time.
-The server excludes private data that the caller cannot access.
+A `Snapshot` holds `session`, `clock`, `contest_awards`, `event`, `membership`, `has_specialist`, `teams`, `issues`, `resolutions`, `history`, `attachments`, `pending_removals`, `awards`, `members`, `audit`, and `server_time`.
+The server leaves out what the caller cannot read:
 
-`execute(sessionId, requestId, command)` returns the affected issue ID.
-`Command` retains the existing action names, expected issue revision, and action fields in `model.ts`.
-The request ID identifies one attempted action, including its retries.
-The adapter sends the ID and command unchanged.
-The server prevents a repeated request from creating another action.
+- A contestant reads only the issues of the own team, with public history, public images, and confirmed contest-wide awards.
+- Only an admin reads `members` and `audit`. `audit` holds the latest 50 entries.
+- A valid login without a seat receives a snapshot with a null `membership` and empty lists. An invalid login receives 401.
 
-`executeAndRead(sessionId, requestId, command)` is optional. It follows the same rules and also returns the `Snapshot` that the server read right after the commit.
-The Cloudflare adapter implements it, and `POST /api/workflow` adds `snapshot` to a committed reply.
-The server returns the commit even when that read fails, and the reply then has no `snapshot`.
-The client shows the snapshot without another read. Without a snapshot it reads sessions and the snapshot, as before.
-The snapshot is the same data that `GET /api/snapshot` returns, so an action costs one request, not four.
+`clock` holds the time zone, the schedule, the intake state, and the contestant's personal end time. D1 derives these values, and the browser only displays them. `clock.intake.reason` is `before_start`, `running`, `grace`, `ended`, `override_open`, `override_closed`, or `awaiting_live_passwords`. `clock.intake.changes_at` is the next instant at which the state changes by time alone. `ContestSummary.intake` holds the same state, with the field name `changesAt`.
 
-`WorkflowRejectedError` means that the server rejected the command.
-The UI can clear the pending request and accept a new command.
-Other failures leave the write outcome unknown.
-The UI retains the request ID and command for **Retry last request**.
-An invalid success response also leaves the outcome unknown because the write may have committed.
+`Command` is defined in [model.ts](../src/connected/model.ts). The adapter sends the request ID and the command unchanged.
+`executeAndRead` saves the client a second read. The server returns a committed result even when the read after it fails, and the reply then has no `snapshot`. The client then reads again.
 
-## Administration
+`WorkflowRejectedError` confirms that the server rejected the command. The UI can clear the pending request and accept a new command.
+Other failures leave the write outcome unknown, including an invalid success response. The UI keeps the request ID and the command for **Retry last request**.
 
-`Backend.admin.account(sessionId, command)` accepts `create_account`, `set_username`, or `reset_password`.
-`AccountCommand` specifies each action's required fields.
-The result contains `temporaryPassword` when the action creates replacement credentials.
+## Management
 
-`saveMember()` assigns the team, roles, and admin flag.
-`removeMember()` revokes membership in one session.
-The management command `set_intake` takes a mode: `schedule` follows the contest's schedule, and `open` or `closed` hold intake by hand. `contestAwards.execute()` records and confirms contest-wide time awards.
-`setImageLimits()` sets the file size, image count, and combined size.
-The size inputs use the existing UI convention of 1,048,576 bytes per MB.
-`editRoster(sessionId, command)` takes a `RosterCommand`:
+| Operation | Route | Result |
+| --- | --- | --- |
+| `site()` | `GET /api/site` | Returns `SiteOverview`: the webmasters, the read restriction, the events with their counts, and the contests to join. Returns `null` for a caller who is not a webmaster. |
+| `event(eventId?)` | `GET /api/event` | Returns `EventConsole`: the event, its admins, people, entrants, contests, staff assignments, entries, and latest 50 audit entries. Requires an event admin of the event or a webmaster. Without an ID, it reads the caller's own event. |
+| `execute(requestId, command)` | `POST /api/manage` | Runs one `ManageCommand`. Returns a `ManageReceipt` with the created IDs. |
+| `issueCredentials(requestId, input)` | `POST /api/credentials` | Issues a temporary password for each of 1 to 8 accounts. |
 
-| Command | Effect |
-| --- | --- |
-| `add_teams` | Adds 1 to 300 teams. Each team carries a client ID, a name, and a location. A repeated ID adds no second team. |
-| `update_team` | Sets the name and the location of one team. |
-| `delete_team` | Deletes a team that has no issue and no account. |
-| `set_categories` | Replaces the ordered category list. |
+`requirementOf` in [manage.ts](../src/server/adapters/cloudflare/manage.ts) holds one row for each command. The levels have these meanings:
 
-Only an admin of an active session edits its roster. Names are 1 to 200 characters. Two teams cannot share a name, and two categories cannot share a name. Minsky ignores capital letters, Unicode form, and spaces at the ends when it compares names.
-A team that has an issue or an account stays. A category that an issue uses stays. The rejection names the reason.
-The Worker checks each rule before the write for a clear message. It checks each rule again in the same batch as the write, so a change that lands in between rolls the batch back.
+- `site` means a webmaster.
+- `event` means an event admin of that event, or a webmaster.
+- `contest` means an admin of that contest, an event admin of its event, or a webmaster.
 
-Account resets and username changes require admin access to every affected session.
-The browser adapter does not implement those checks.
+| Command | Requires | Effect |
+| --- | --- | --- |
+| `create_event` | `site` | Creates an event with a name, a code, an IANA time zone, and its first event admin. |
+| `add_webmaster` | `site` | Creates a webmaster account without a password. |
+| `remove_webmaster` | `site` | Removes the site grant and ends the logins of another webmaster. The last enabled webmaster stays. A webmaster who leaves needs another webmaster who can sign in. |
+| `set_webmaster_reads` | `site` | Turns the webmaster read restriction on or off. |
+| `join_contest` | `site` | Records a webmaster's audited join. D1 accepts it only while the read restriction is on. |
+| `update_event` | `event` | Changes the name, the code, and the time zone. |
+| `set_event_admin` | `event` | Adds or removes an event admin. An entrant's sign-in cannot be an event admin. |
+| `create_people` | `event` | Creates 1 to 300 staff accounts without passwords. |
+| `create_entrants` | `event` | Creates 1 to 300 teams or single contestants. Each gets one sign-in account without a password. |
+| `rename_entrant` | `event` | Renames the entrant, and its entry in every contest. |
+| `add_entrant_sign_in` | `event` | Creates a sign-in for an entrant that has none. |
+| `create_contest` | `event` | Creates a `practice` or `live` contest with a type, a schedule, and categories. The kind stays fixed. Intake follows the schedule. |
+| `update_contest` | `event` | Changes the name and the type. An optional schedule replaces the current one. |
+| `assign_entrants` | `event` | Enters 1 to 300 entrants in a contest, each with a location. D1 seats each entrant's sign-in and checks the contest type. |
+| `unassign_entrant` | `event` | Removes an entry that has no issue. |
+| `assign_staff` | `event` | Sets the admin flag and the roles of a staff seat. The seat needs the flag, a role, or both. |
+| `unassign_staff` | `event` | Removes a staff seat. |
+| `set_intake` | `contest` | Sets the mode. `schedule` follows the contest's schedule, and needs one. `open` and `closed` hold intake by hand. |
+| `set_image_limits` | `contest` | Sets the file size of 1 to 50 MB, the count of 1 to 24, and the combined size of 1 to 120 MB. The file size cannot exceed the combined size. One MB is 1,048,576 bytes. |
+| `set_categories` | `contest` | Replaces the ordered list of 1 to 50 categories. A category that an issue uses stays. |
+| `set_location` | `contest` | Sets the location of one entrant in the contest. |
+| `set_handle` | Account rule | Changes a handle. The [authentication reference](cloudflare-authentication.md#credentials-and-permissions) defines who can. |
+
+These rules apply to the text and the state of a command:
+
+- Names hold 1 to 200 characters without control characters. A location holds at most 200 characters.
+- Two entrants of one event cannot share a name, and two categories of one contest cannot share a name. Minsky ignores capital letters, Unicode form, and spaces at the ends when it compares names.
+- An event code holds 3 to 40 lowercase letters, digits, or hyphens, and starts with a letter or digit. Codes are unique on the site.
+- A schedule ends after it starts, with at most 240 minutes of grace.
+- `assign_entrants` and `add_entrant_sign_in` receive 409 when they would close an open live contest, unless the command carries `closeReporting: true`.
+- `update_contest` receives 409 when a new schedule would stop a running live contest. Close reporting first, then move the contest and issue new passwords.
+- An archived event rejects every command that targets it.
+
+A repeat with the same request ID and command returns the first receipt. A receipt never holds a password.
+A 4xx reply becomes `RequestRefusedError`, which carries the server's reason. A 409 can also say that the outcome is unknown, and the caller then refreshes before it retries. Other failures leave the outcome unknown, and the caller retries with the same request ID.
+
+`issueCredentials` takes a `CredentialIssue` with these fields:
+
+- `eventId` names the event of the accounts. The caller must be able to manage each account. Null means other webmasters, and only a webmaster can ask.
+- `accountIds` holds 1 to `ISSUE_BATCH`, which is 8, different accounts. The caller's own account is refused with 400.
+- `contestId` names the contest that the organizer issues for. A live target opens the overlapping live contests. Each account needs a seat in it.
+- `voidLivePasswords` confirms that the new password stops the passwords of live contests that have not ended. Without it, that issue receives 409.
+
+An issue also receives 409 when the new password would sign a contestant out of a contest with open intake.
+Each `IssuedCredential` holds `accountId`, `handle`, and `temporaryPassword`. The server returns the password once and never stores it. A repeat with the same request ID returns null passwords, and the organizer issues again with a new request ID.
+
+## Contest-wide awards
+
+`contestAwards.execute(sessionId, requestId, command)` calls `POST /api/contest-awards` and resolves to the award ID. An archived event rejects each command.
+
+| Command | Who | Effect |
+| --- | --- | --- |
+| `grant` | Jury | Records 1 to 1,440 minutes and an explanation of 1 to 2,000 characters for every contestant. One contest holds one unconfirmed award of each size. |
+| `apply` | Volunteer, specialist, or jury | Confirms that staff applied the minutes outside Minsky. |
+| `withdraw` | Jury | Withdraws an unconfirmed award. The record stays and gives no time. A confirmed award cannot be withdrawn. |
+
+Only confirmed minutes extend a contestant's personal end time. Minsky changes no external contest clock.
+A repeat with the same request ID does not write again. A refusal has a 4xx status and carries the reason.
+An award for one issue is the workflow command `award`.
+
+## Images
+
+| Operation | Route | Result |
+| --- | --- | --- |
+| `begin(input)` | `POST /api/images` | Reserves an image for one hour, using the request ID, issue, visibility, name, and size. Returns the image ID and the original and thumbnail paths. |
+| `upload(path, body, contentType, onProgress)` | `PUT /api/image/<path>` | Uploads one object and reports the bytes sent. |
+| `finish(sessionId, attachmentId)` | `POST /api/images` | Validates and publishes the reserved image. A repeat after a lost success response does not publish another image. |
+| `remove(sessionId, attachmentId)` | `POST /api/images` | Removes the image. Only the uploader can remove it. A failed file deletion stays retryable. |
+| `abandon(sessionId, attachmentId)` | `POST /api/images` | Cleans up an unfinished upload. |
+| `download(path)` | `GET /api/image/<path>` | Returns a `Blob` after the server checks access. |
+
+Only staff of an active event reserve an image. Visibility is `public` or `internal`, and it stays fixed.
+The server removes control characters and invisible direction marks from the name, replaces `/` and `\` with `-`, and keeps the first 200 characters.
+
+Each download checks current access instead of reusing an earlier authorized response. These checks cannot retract bytes that a person already received.
+
+`attachmentPath()` defines the object key as `sessionId/issueId/attachmentId/original` or `sessionId/issueId/attachmentId/thumbnail`.
+An object key is not a public URL or an access credential.
+
+`ImageRequestError` has three flags:
+
+- `validation` marks a rejected request.
+- `restart` means that the caller starts a new upload.
+- `incomplete` means that `finish()` needs the original or the thumbnail first. The UI resumes the upload after a retry check, without reading a provider's error text.
 
 ## Announcements
 
-`Backend.announcements` reads and writes session announcements. It is separate from the issue snapshot, so a slow or failed read cannot delay issue work.
+`Backend.announcements` reads and writes contest announcements. It is separate from the issue snapshot, so a slow or failed read cannot delay issue work.
+The [announcement reference](session-announcements.md) defines the behavior and the routes.
 
 | Operation | Result |
 | --- | --- |
 | `snapshot(sessionId, signal?)` | Returns the announcements and ready images that the caller can read, with server time. Members read active records. Admins and jury also read expired records. Nobody reads removed records through this call. A newer read can abort an older one. |
-| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. Removal hides the announcement from every member and keeps its record, images, and files for a future contest log export. A repeated request ID with the same command does not repeat the write. |
+| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. Removal hides the announcement from every member and keeps its record, images, and files for a future contest log export. |
 | `uploadImage(input)` | Reserves, transfers, and publishes one image. A repeated request ID does not add a second image. |
 | `removeImage(sessionId, imageId)` | Removes the image through the authorized server operation. A failed file deletion stays retryable. |
-| `downloadImage(image)` | Returns a `Blob` after the provider checks current access. |
+| `downloadImage(image)` | Returns a `Blob` after the server checks current access. |
 
 `AnnouncementRejectedError` extends `WorkflowRejectedError`. It confirms that the server rejected the command.
 Its `conflict` field is true when the announcement changed after the caller read it.
@@ -211,87 +203,79 @@ Image failures use `ImageRequestError`.
 
 ## Avatars
 
-`Backend.avatars` reads and changes profile pictures. A picture belongs to an account, not to a session.
+`Backend.avatars` reads and changes profile pictures. A picture belongs to an account, not to a contest.
 The account page and the phone **Me** tab change the caller's picture. `PersonAvatar` shows the pictures. See [Profile pictures](frontend-architecture.md#profile-pictures).
 
 This visibility rule decides which pictures a caller can read:
 
 - Every account reads its own picture.
-- In one session, staff read the pictures of the other staff of that session. A staff membership has no team, and it has the admin flag or a role.
-- A team account reads only its own picture. No read gives a team account the pictures of staff.
+- In one contest, staff read the pictures of the assigned staff of that contest. An assigned staff seat has no team, and it has the admin flag or a role. An event admin or a webmaster without such a seat holds no assigned seat, so other staff do not read that picture.
+- A team account reads only its own picture.
 
-| Operation | Result |
-| --- | --- |
-| `list(sessionId)` | Returns a `PersonAvatar` for each picture that the caller can read in the session. A record has `person_id` and `avatar_id`. |
-| `upload({ requestId, file })` | Replaces the caller's picture and returns the new record. A repeated request ID returns its first result and stores no other picture. |
-| `remove()` | Removes the caller's picture. It succeeds when the caller has no picture. |
-| `download(sessionId, avatar)` | Returns a `Blob` after the provider checks the rule for that session again. |
+| Operation | Route | Result |
+| --- | --- | --- |
+| `list(sessionId)` | `GET /api/avatars` | Returns a `PersonAvatar` for each picture that the caller can read in the contest. A record has `person_id` and `avatar_id`. |
+| `upload({ requestId, file })` | `PUT /api/avatar/<requestId>` | Replaces the caller's picture and returns the new record. A repeated request ID returns its first result and stores no other picture. |
+| `remove()` | `POST /api/avatars` | Removes the caller's picture. It succeeds when the caller has no picture. |
+| `download(sessionId, avatar)` | `GET /api/avatar/<sessionId>/<avatarId>` | Returns a `Blob` after the server checks the rule for that contest again. |
 
 The server accepts a JPEG, PNG, or WebP file of up to `AVATAR_MAX_BYTES`, 262,144 bytes, from [imageFile.ts](../src/connected/imageFile.ts).
 It checks the file signature and stores that type. The declared content type does not change the result.
 The frontend crops the picture to a square and encodes it as a JPEG of no more than 512 by 512 pixels before upload. The new encoding removes EXIF and location metadata.
 Each stored picture has its own `avatar_id`, so a client can use it as a cache key.
 
-Failures use `ImageRequestError`. `validation` marks a rejected file or request. `restart` means that the upload expired. The caller then selects the picture again with a new request ID.
+Failures use `ImageRequestError`. `validation` marks a rejected file or request. `restart` means that the upload expired, and the caller selects the picture again with a new request ID.
 
-The issue snapshot and its `members` list do not contain pictures.
-A picture change sends no live signal.
-The frontend reads `list()` again after each live signal and on the session timer. The timer runs every 10 seconds while the live channel is down and every 60 seconds while it is connected. Other people then see a changed picture after their next read.
+The issue snapshot and its `members` list do not contain pictures, and a picture change sends no live signal.
+The frontend reads `list()` again after each live signal and on the snapshot timer, which runs every 60 seconds. Other people see a changed picture after their next read.
 
-The Cloudflare route checks the given session before and after it reads R2.
-See [Cloudflare account avatars](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket).
-
-## Images
-
-`Backend.images` implements `ImageTransport`.
-
-| Operation | Result |
-| --- | --- |
-| `begin(input)` | Reserves an image using the request ID, issue, visibility, name, and size. Returns the image ID and original and thumbnail paths. The server removes control characters, format characters, and path separators from the name and keeps its first 200 characters. |
-| `upload(path, body, contentType, onProgress)` | Uploads one object and reports the bytes sent. |
-| `finish(sessionId, attachmentId)` | Validates and publishes the reserved image. A repeat after a lost success response does not publish another image. |
-| `remove(sessionId, attachmentId)` | Removes the image through the authorized server operation. A failed file deletion remains retryable. |
-| `abandon(sessionId, attachmentId)` | Cleans up an unfinished upload. |
-| `download(path)` | Returns a `Blob` after the storage service checks access. |
-
-Each download checks current access instead of reusing an earlier authorized response.
-These checks cannot retract bytes that a user already received.
-
-`attachmentPath()` defines the common object key as `sessionId/issueId/attachmentId/original` or `sessionId/issueId/attachmentId/thumbnail`.
-An implementation can translate these keys to its storage system.
-An object key is not a public URL or an access credential.
-
-`ImageRequestError.validation` marks a rejected upload.
-`restart` carries the existing retry classification.
-`incomplete` means that `finish()` requires the original or thumbnail upload to complete first.
-The UI uses `incomplete` to resume upload after a retry check.
-It does not inspect a provider's error text for that decision.
+The [Cloudflare design](cloudflare-backend-design.md#account-avatars-use-the-private-image-bucket) describes how the Worker stores pictures.
 
 ## Live updates
 
-`Backend.updates.subscribe()` accepts the session ID, user ID, `onChange`, and `onConnection`.
-`onChange()` signals that the current snapshot may be stale.
-It does not deliver issue bodies, staff notes, or membership records.
-`onConnection(true)` reports that the live connection is ready to receive changes.
-The UI fetches a new authorized snapshot when that connection opens or reconnects.
+`Backend.updates.subscribe()` accepts the session ID, user ID, `onChange`, and `onConnection`. It connects to `GET /api/updates`.
 
-The cleanup function can run more than once and stops subsequent callbacks.
-Subscriptions on the same `Backend` are independent, including when an earlier subscription is still closing.
-The UI also refreshes every 10 seconds while the live channel is down, every 60 seconds while it is connected, and on focus or network restoration.
-Those reads detect revoked access even when the subscriber receives no more events.
+- `onChange()` signals that the current snapshot may be stale. It does not deliver issue bodies, staff notes, or membership records.
+- `onConnection(true)` reports that the live connection is ready to receive changes. The UI reads a new authorized snapshot when the connection opens, drops, or reconnects.
+- The cleanup function can run more than once and stops later callbacks.
+- Subscriptions on the same `Backend` are independent, also when an earlier subscription is still closing.
+
+The UI also reads on a timer, on focus, and at each time boundary of the contest. The [refresh schedule](frontend-architecture.md#refresh-schedule) defines those reads. They detect revoked access even when the subscriber receives no more events.
 Live notifications do not authorize reads or writes.
 
-## Verification coverage
+## Modules
 
-`npm run test:e2e` uses the application with mocked provider responses.
-It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
-The suite also covers the existing account, team-search, image, refresh, and announcement behavior.
+| Module | Responsibility |
+| --- | --- |
+| [contracts.ts](../src/backend/contracts.ts) | Defines `Backend` and each group of operations. |
+| [errors.ts](../src/backend/errors.ts) | Defines workflow rejection, announcement rejection, request refusal, and image retry errors. |
+| [index.ts](../src/backend/index.ts) | Creates `backend` for the current origin. |
+| [cloudflare/backend.ts](../src/backend/cloudflare/backend.ts) | Calls the same-origin API and manages independent live connections. |
+| [server/workflow.ts](../src/server/workflow.ts) | Defines shared decisions, orchestration, and the operation-level persistence interface. |
+| [server/adapters/d1/store.ts](../src/server/adapters/d1/store.ts) | Persists workflow commands in guarded D1 batches. |
+| [server/adapters/cloudflare/applicationWorker.ts](../src/server/adapters/cloudflare/applicationWorker.ts) | Constructs the Cloudflare services and handles application and maintenance requests. |
+| [server/adapters/cloudflare/http.ts](../src/server/adapters/cloudflare/http.ts) | Checks each application request and maps it to a service. |
+| [server/adapters/cloudflare/authority.ts](../src/server/adapters/cloudflare/authority.ts) | Resolves what an account may do in the site, an event, or a contest. |
+| [server/adapters/cloudflare/application.ts](../src/server/adapters/cloudflare/application.ts) | Reads contest lists and authorized snapshots. |
+| [server/adapters/cloudflare/manage.ts](../src/server/adapters/cloudflare/manage.ts) | Reads the site and event consoles, runs management commands, and issues temporary passwords. |
+| [server/adapters/cloudflare/schedule.ts](../src/server/adapters/cloudflare/schedule.ts) | Defines the SQL that derives intake, personal end times, and the contest clock. |
+| [server/adapters/cloudflare/contestAwards.ts](../src/server/adapters/cloudflare/contestAwards.ts) | Commits contest-wide award commands. |
+| [server/adapters/cloudflare/announcements.ts](../src/server/adapters/cloudflare/announcements.ts) | Reads announcement snapshots and commits guarded announcement commands. |
+| [server/adapters/cloudflare/announcementImages.ts](../src/server/adapters/cloudflare/announcementImages.ts) | Manages private announcement image reservations, transfers, publication, and cleanup. |
+| [server/adapters/cloudflare/avatars.ts](../src/server/adapters/cloudflare/avatars.ts) | Stores, lists, reads, and removes account avatars, and retries their file cleanup. |
+| [server/adapters/cloudflare/images.ts](../src/server/adapters/cloudflare/images.ts) | Manages private image reservations, transfers, publication, and cleanup. |
+| [server/adapters/cloudflare/live.ts](../src/server/adapters/cloudflare/live.ts) | Delivers audience-specific invalidations and manages current connection access. |
+| [connected/model.ts](../src/connected/model.ts) | Defines workflow commands and validates snapshots. It has no provider imports. |
+| [connected/capabilities.ts](../src/connected/capabilities.ts) | Holds the one table of what a seat may do. |
+| [connected/imageFile.ts](../src/connected/imageFile.ts) | Defines file checks, attachment paths, and error classification. |
 
-Those mocked checks establish request and UI behavior. Hosted provider checks run separately.
-`npm test` also checks complete D1 persistence through `WorkflowPersistence`.
-It includes the shared-service rules.
-Hosted checks use isolated accounts and records through [the hosted Cloudflare checks](run-provider-tests.md).
-The [shared provider suite](provider-test-contracts.md) checks these contracts through real browser adapters. It does not cover `announcements` or `avatars` yet.
-`npm test` checks the avatar rule against local D1 and R2. `npm run test:connector:runtime` sends avatar requests through a local HTTPS Worker.
-[Run the shared checks](run-provider-tests.md) separately from the provider-specific hosted UI suite.
-The latest observed results are in [run log](history/run-log.md).
+The UI imports the contracts, the shared errors, and `backend`.
+ESLint rejects provider SDKs, browser implementations, and server adapters in shared application code, shared server rules, and shared test scenarios.
+It checks static imports, re-exports, and literal dynamic UI imports, and it rejects computed dynamic UI paths because it cannot determine their provider.
+
+## Test coverage
+
+`npm test` runs the D1, R2, Durable Object, and browser adapter tests with local bindings.
+`npm run test:e2e` runs browser journeys against a local Worker or mocked responses. It covers request-ID reuse after an uncertain write and a new request after a definitive rejection.
+The [shared provider suite](provider-test-contracts.md) checks these contracts through the real browser adapter against hosted resources. It does not cover `announcements`, `avatars`, or `contestAwards`, and it covers only some `manage` commands.
+[Run the provider tests](run-provider-tests.md) gives the hosted commands.

@@ -63,7 +63,7 @@ describe("image limits", () => {
     });
   });
 
-  it("keeps the bounds of the form from before T0015", () => {
+  it("keeps the account form bounds", () => {
     expect(isValidLimit("fileMb", 1)).toBe(true);
     expect(isValidLimit("fileMb", 50)).toBe(true);
     expect(isValidLimit("fileMb", 51)).toBe(false);

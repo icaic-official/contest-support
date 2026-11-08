@@ -1,82 +1,96 @@
-# Connected manual verification
+# Verify Minsky manually
 
-## Documentation site (T0011)
+This guide lists the checks that a person does by hand, in a browser, on a real phone, or with assistive technology.
+A check on this page is not a result until you run it. Record what you observed in the pull request that you verify.
+Browser automation does not establish results for real devices, assistive technology, or capacity.
 
-Run `npm run docs:build` and `npm run docs:test` after installing the separate `site/` dependencies.
-For the published site, run `MINSKY_DOCS_URL=https://minsky-docs.icaic-minsky.workers.dev npm run docs:test`.
-These checks only read documentation.
+## Documentation site
+
+To check the site, install the separate `site/` dependencies. Then run `npm run docs:build` and `npm run docs:test`.
+To check a published site, set `MINSKY_DOCS_URL` to its address and run `npm run docs:test`. These checks only read documentation. The maintainers' site is at `https://minsky-docs.icaic-minsky.workers.dev`.
 Check a direct guide URL after refresh, search by keyboard, phone navigation, and a missing page.
 Review light and dark themes at desktop and 320px widths.
 The footer on the landing and sign-in pages, the **Documentation** link in the **Help** section of the account page and the documentation link in the phone **Me** tab open the guides in a new tab.
-Those links reach the development app only after its separate frontend deployment.
 
 ## Cloudflare authentication
 
 Follow [Verify Cloudflare authentication](verify-cloudflare-authentication.md) for isolated HTTPS browser checks.
 These checks use fictional local accounts.
-The account reference records current cookie, origin, recovery, and session restrictions.
+The [authentication reference](cloudflare-authentication.md) lists the current cookie, origin, recovery, and session restrictions.
 
-## Connected application
+## Prepare the accounts
 
-The live development app is the Cloudflare Worker at https://minsky-dev.icaic-minsky.workers.dev.
-Use an organizer-provided sign-in link, username, and password. A webmaster uses **Site sign-in** instead of an event code.
-Docker and persona switching are not required.
-For a separate Cloudflare installation, create the first admin through its bootstrap step.
-Use `npm run cloudflare:recover-admin` when the development webmaster cannot sign in.
-Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, and admin.
-Work only in a clearly identified development or test session.
+Run these checks on an installation that holds only test data. Follow [Install on Cloudflare](../site/src/content/docs/operators/installation.mdx) to create one and its first webmaster. Maintainers use the `minsky-dev` Worker at `https://minsky-dev.icaic-minsky.workers.dev`.
 
-T0015 replaced the earlier workspace with three UIs. The membership and the window width select the UI:
+Use the sign-in link, username, and password from a credential sheet. A webmaster uses **Site sign-in** instead of an event code.
+If the webmaster cannot sign in, run `npm run cloudflare:recover-admin -- --config <wrangler-config> --username <webmaster-username>` in an interactive terminal.
+Use a separate browser or profile for each account: contestant, volunteer, specialist, jury, contest admin, event admin, and webmaster.
+Work only in a clearly identified test contest.
+
+The membership and the window width select the UI:
 
 - A contestant account gets the contestant app. Use 1280 × 800 for the laptop layout, and 390 × 844 and 320 × 740 for the phone layout.
 - A staff account below 1024 px gets the organizer phone app. Use 390 × 844, and 320 × 740 for the narrow check.
 - A staff account at 1024 px and wider gets the organizer desktop console. Use 1280 × 800.
 
+An event admin and a webmaster also use the event console at `/event`. A webmaster uses the site dashboard at `/site`.
+
 Unless a step names one UI, do the step in the organizer phone app and again in the organizer desktop console.
 Section 7 lists the checks for each UI.
+
+No screen or command archives an event. To test an archived event, run this command against your test database. Never run it on an event that holds real data. Replace the values in capitals. This command has not been run.
+
+```sh
+npx wrangler d1 execute TEST_DATABASE --remote --config TEST_WRANGLER_CONFIG --command "UPDATE events SET archived = 1 WHERE id = 'EVENT_ID'"
+```
 
 ## 1. Login and session access
 
 1. Open the sign-in link `/?event=<code>`. Check that the form shows the event code. Sign in with a username that uses different letter case.
 2. Refresh the page.
-3. Check that the session returns.
+3. Check that you stay signed in.
 4. Sign out.
 5. Check that contest data disappears.
-6. Sign in with an account that has no membership.
+6. Sign in with a staff account that holds no seat in any contest.
 7. Check that the access message appears.
 8. Change your password through the labeled form.
 
 ## 2. Account administration
 
-1. Sign in as admin.
-2. Open the **Session** tab in the phone app, or **Accounts** in the desktop console sidebar.
-3. Create a contestant username account for a roster team.
-4. Give its temporary password to the account holder through a secure channel.
-5. Assign individual staff accounts.
-6. Assign combined specialist, volunteer, and jury roles.
-7. Check the membership list.
-8. Revoke one session membership.
-9. Query the database directly with the revoked account.
-10. Check that the query returns no session data.
-11. Refresh that account's page.
-12. Check that the UI clears the data.
-13. Repeat the UI check when the page receives focus.
-14. Attempt to remove the last admin.
+Create the accounts in the event console:
 
-Expected result: the app rejects removal of the last admin.
+1. Sign in as a webmaster. On **Site**, select **Create event**. Enter the event name, the event code, the time zone, and the first event admin. Check that the first event admin's password shows once.
+2. Sign in as that event admin from the sign-in link and change the temporary password. Check that `/event` opens on the **Contests** tab.
+3. Create a contest with **Create contest**.
+4. On **People**, enter lines of `name, username` in **Add people** and select **Create people**. Check that **Share these credentials securely** shows the sign-in link and each username and password once, with **Copy all**, **Print sheets**, and **Done**. Check that the link names the event code.
+5. Select **Done**. Check that the people now show **Reset password** and that the passwords do not show again.
+6. On **Entrants**, select the **Team** kind and import one team with **Import entrants**. Then import one **Single contestant**.
+7. On **Assignments**, assign the entrants to the contest. Assign a staff member with combined Specialist, Volunteer, and Jury roles. Assign another staff member as **Contest admin**.
+8. Give each temporary password to its account holder through a secure channel.
+9. Check the membership list on **Accounts** in the desktop console, or in the **Session** tab in the phone app.
+10. On **Assignments**, select **Remove** for one staff member.
+11. Send a direct API read of the contest snapshot as the removed account.
+12. Check that the read returns no contest data.
+13. Refresh that account's page.
+14. Check that the UI clears the data.
+15. Repeat the UI check when the page receives focus.
+16. As a webmaster, attempt to remove the last webmaster on **Site**.
 
-Check the admin screens of T0015 in both organizer layouts:
+Expected result: the app refuses with "The last webmaster cannot be removed".
+
+Check the contest admin screens in both organizer layouts:
 
 1. In the phone **Session** tab, check the status counts, the intake panel (**Open now**, **Close now**, and **Return to schedule**) and the image limits with the − and + buttons.
-2. Select **New account**. Create a staff account. Check that the sheet shows the sign-in link, the username, and the temporary password once, with copy buttons and **Done**. Check that the link names the event code.
+2. Open another account and select **Reset password**. Check that a confirmation dialog shows first. Check that the new credentials show once, with copy buttons and **Done**.
 3. Select **Done**. Open the account again. Check that the credentials do not show again.
-4. Reset the password of another account. Check that a confirmation dialog shows first. Check that the new credentials show once.
-5. Check that your own account has no password reset.
-6. Remove session access from an account. Check that a confirmation dialog shows first.
-7. In the desktop console, repeat steps 2 to 6 with **Create account** and **Manage** on **Accounts**.
-8. In **Session settings**, change the image limits. Check that the phone **Session** tab shows the same values.
-9. Archive the event. Check that every admin control is disabled.
-10. In a session without teams, open the new account form. Check that the **Team** card is dimmed and says **Add a team first.** Add a team. Check that the card is available and says **Shared team login**.
+4. Check that your own account has no **Reset password** button.
+5. Check that a team account has no username form. Change the username of a staff account. Check that its password and open sessions stay.
+6. In the desktop console, repeat steps 2 to 5 with **Manage** on **Accounts**.
+7. In **Session settings**, change the image limits. Check that the phone **Session** tab shows the same values.
+8. In **Team locations**, change a location. Check that the phone **Session** tab shows the same value.
+9. In **Session settings**, add and move a category, and save the list. Check that a category that an issue uses cannot be removed.
+10. Archive the event. Check that every admin control is disabled.
+11. In a contest with no entrants, open **Team locations**. Check that it says an event admin assigns the teams in the event console.
 
 ## 3. Contestant intake
 
@@ -119,7 +133,7 @@ Expected result: successful submission closes the form and selects the new repor
 8. Check that the volunteer remains the owner.
 9. Accept the handoff as another specialist with **Accept handoff**.
 10. Check that the contestant cannot see the internal note.
-11. Repeat the privacy check through direct API and history queries.
+11. Repeat the privacy check with a direct API read of the snapshot as the contestant.
 12. Leave the reply input blank.
 13. Check that the send button remains disabled. It is **Send to team** or **Add internal note** in the phone app, and **Send** or **Add note** in the desktop composer.
 
@@ -144,10 +158,10 @@ Check submission retries through account-check failures:
 5. Repeat with a response delayed until after account-check recovery. Check that focus stays on the current page.
 6. Sign out with an uncertain request. Sign in again and check that the old retry is absent.
 
-With isolated contestant memberships in two sessions, lose a submission response and remove the original session membership.
-Let the page select the remaining session. Retry the request and check that the server rejects access to the original session.
-Check that the remaining session contains no copy of the submitted issue.
-The cases in `tests/workflow-session-retry.spec.ts` exercise these session checks through the Cloudflare services on local D1.
+With isolated contestant memberships in two contests, lose a submission response and remove the original contest membership.
+Let the page select the remaining contest. Retry the request and check that the server rejects access to the original contest.
+Check that the remaining contest contains no copy of the submitted issue.
+The cases in `tests/workflow-session-retry.spec.ts` exercise these checks through the Cloudflare services on local D1.
 
 ## 5. Resolution and award
 
@@ -157,7 +171,7 @@ The cases in `tests/workflow-session-retry.spec.ts` exercise these session check
 4. Repeat the award check with zero, preset, and custom whole-minute values on suitable test issues. Enter `2.5` as a custom value. The form shows a message and keeps **Record** disabled.
 5. Confirm external application as staff.
 
-Expected result: Minsky records application status without changing an external contest clock.
+Expected result: Minsky records the application status and does not change the external contest clock.
 
 ## 6. Reopening and persistence
 
@@ -170,7 +184,7 @@ Expected result: Minsky records application status without changing an external 
 7. Refresh each browser.
 8. Compare the shared state.
 
-## 7. Interface and accessibility (T0015)
+## 7. Interface and accessibility
 
 Do these checks in the light theme and again in the dark theme.
 Change the theme with the theme menu. Check that the choice stays after a page reload.
@@ -197,14 +211,14 @@ Review the sign-in page at 1280 × 800, 390 × 844 and 320 × 740.
 3. Select **Site sign-in** with the keyboard. Check that the event code field disappears and the heading reads **Site sign-in**. Select **Sign in to an event**. Check that the code returns.
 4. Sign in with a wrong event code, then a wrong username, then a wrong password. Check that each gives the same message.
 5. Sign in with an account without membership. Check that the access screen shows **Refresh access** and **Sign out**.
-6. Sign in with a member account. Disconnect the network and wait up to 10 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
+6. Sign in with a member account. Disconnect the network and wait up to 60 seconds for the access screen. Check that it asks you to check the connection and does not mention an organizer. Select **Refresh access**. Check that the button stays disabled while the read runs. Connect again and select the button. Check that the workspace returns.
 7. Press Tab once after sign-in. Check that **Skip to main content** appears and moves focus to the main content.
 
 ### Organizer phone app (390 × 844)
 
 Sign in as a volunteer, a specialist, a jury member and an admin.
 
-1. Check the bottom tabs. Volunteers and specialists get **Queue**, **Mine**, **Find** and **Me**. Jury members get **Awards**. Admins also get **Session**.
+1. Check the bottom tabs. Every staff member gets **Find** and **Me**. Volunteers and specialists also get **Queue** and **Mine**. Jury members get **Awards**. Admins get **Session**. An admin without a support role still gets **Queue**.
 2. Check that a jury-only member sees resolved issues only, except a reopened issue with a pending award.
 3. In **Queue**, check the chips, the cards sorted by unresolved time and the timer colors. The timer is neutral below 10 minutes, amber below 20 minutes and rose after that.
 4. Claim an issue on its card. Check that the list stays. Use **Claim and go** on another issue. Check that the issue view opens.
@@ -222,7 +236,7 @@ Sign in as a volunteer, a specialist, a jury member and an admin.
 
 Sign in as the same accounts.
 
-1. Check the sidebar pages. Volunteers and specialists get **Queue**, **Assigned to me** and **Handoffs**. Jury members get **Award review**. Every person gets **Teams & tables**. Admins also get **Overview**, **Accounts** and **Session settings**.
+1. Check the sidebar pages. Volunteers and specialists get **Queue**, **Assigned to me** and **Handoffs**. Jury members get **Award review**. Every staff member gets **Teams & tables**. Admins also get **Overview**, **Accounts**, **Team locations** and **Session settings**.
 2. Collapse the sidebar. Reload the page. Check that it stays collapsed.
 3. On the queue, press J and K. Check that focus moves between rows. Press Enter on an issue number. Check that the side sheet opens.
 4. Check that J and K do nothing while a field or a dialog has focus.
@@ -239,7 +253,7 @@ Sign in as the same accounts.
 
 Sign in as a contestant.
 
-1. Check the top bar: event, session, **Live** or **Reconnecting**, the theme menu and the account menu with **My account**, **Change password** and **Sign out**.
+1. Check the top bar: event, contest, **Live** or **Reconnecting**, the theme menu and the account menu with **My account**, **Change password** and **Sign out**.
 2. Open a report. Check the headline, the live unresolved timer, the four-step tracker, the resolution cards, the award card and the messages.
 3. Select **Report an issue**. Check the category tiles, the description limit of 2,000 characters and the team location.
 4. Send a reply with Enter. Add a line with Shift+Enter.
@@ -264,15 +278,15 @@ Sign in as a contestant on a phone, or in a window that is narrower than 1024 px
 
 ### Account page (1280 × 800 and 1024 × 768)
 
-Do these checks as a staff account with several roles, as a session admin, and as a contestant.
+Do these checks as a staff account with several roles, as a contest admin, and as a contestant.
 The desktop console and the contestant app show the page. The phone app keeps its **Me** tab.
 
 1. In the console, select the person card at the bottom of the sidebar. Check that the address is `/account`, that focus is on **My account** and that the card shows the open page. Collapse the sidebar. Check that the card shows only the avatar and that a tooltip shows its name.
 2. In the contestant app, open the account menu and select **My account**. Check the same address and focus. Check that the page has no **Skip to report details** link. Select **Minsky** in the top bar. Check that the reports page opens.
 3. Select each link in the section nav. Check that the page scrolls to the section and that the nav stays in view on a wide window. Check that the layout has one column below 768 px of page width and no horizontal overflow.
-4. **Profile**: check the picture, the name, the username and the account ID. Select **Copy**. Check the message and paste the ID somewhere. A team account shows its team and location. Do the checks in [Profile pictures](#profile-pictures) for the picture.
-5. **Access in this session**: check that each role has a badge and a description. Only a session admin sees **Manage session accounts**. A team account shows no role and no admin link. In an archived event, check the archived notice.
-6. **Sessions**: with two sessions, select **Switch** on the other one. Check that its data loads and that the open issue or report is cleared.
+4. **Profile**: check the picture, the name, the username and the account ID. Select **Copy**. Check the message and paste the ID somewhere. A team account shows its team and location. A staff account of an event can change its own username here. A team account and a webmaster cannot. Do the checks in [Profile pictures](#profile-pictures) for the picture.
+5. **Access in this session**: check that each role has a badge and a description. Only a contest admin sees **Manage session accounts**. A team account shows no role and no admin link. In an archived event, check the archived notice.
+6. **Sessions**: with two contests, select **Switch** on the other one. Check that its data loads and that the open issue or report is cleared.
 7. **Security**: enter a wrong current password. Check the error. Enter two different new passwords. Check the message. Enter a valid change. Check the success message and the empty fields. Reload. Check that you are still signed in on `/account`. Sign out and sign in with the new password.
 8. **Appearance**: choose **Light** and **Dark**. Check that the theme changes at once and stays after a reload. Move between the options with the arrow keys.
 9. **Activity**: check the three counts against the issues of this account. Check that the recent list shows the five newest replies, internal notes and resolutions of this account only. A contestant sees no internal note.
@@ -289,12 +303,12 @@ Do them as a staff account on the console, as a staff account on a phone, and as
 1. Turn on location for the phone camera. Take a photo in portrait and one in landscape. Copy them to the computer, or choose them from the phone gallery in the phone app. An iPhone saves HEIC by default, and Minsky accepts only JPEG, PNG and WebP. Export the photo as a JPEG before you copy it.
 2. Open **My account** in the console. Select **Change picture** in the **Profile** section and choose the portrait photo. Check that the preview is upright, that it shows the middle square of the photo, and that the circle shows the same part.
 3. Select **Save picture**. Check the message "Profile picture updated." Check that the new picture shows in the page header, the **Profile** section and the sidebar card at once, without a reload.
-4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/` (Cloudflare). Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
+4. Open the network panel and reload the page. Save the response of the request to `/api/avatar/`. Run `exiftool` on the file. Check that it has no GPS tags or camera model, that it is a JPEG of at most 512 × 512 pixels, and that it is under 256 KB.
 5. Choose the landscape photo and select **Cancel**. Check that the picture does not change and that focus returns to **Change picture**.
 6. Choose a file larger than 2 MB. Check the alert "Choose an image of up to 2 MB." and that no preview opens. Choose a text file with the name `notes.jpg`. Check the alert "Choose a JPEG, PNG, or WebP image."
 7. Choose a very detailed photo of 1 to 2 MB, such as a close photo of gravel. Check that it saves and that the stored file is under 256 KB.
 8. Choose a PNG with a transparent background. Check that the saved picture has a white background.
-9. With a second browser, sign in as another staff member of the same session. Check that the picture shows on an issue that the first account owns within one minute. If that account is an admin, also check the administration account list. Sign in as a contestant. Check that no staff picture shows in any contestant screen.
+9. With a second browser, sign in as another staff member of the same contest. Check that the picture shows on an issue that the first account owns within one minute. If that account is an admin, also check the administration account list. Sign in as a contestant. Check that no staff picture shows in any contestant screen.
 10. Select **Remove picture**. Select **Cancel** in the question. Check that the picture stays. Select **Remove picture** again and confirm. Check the message "Profile picture removed.", the initials in every place, and that focus is on **Change picture**. Check in the second browser that the initials return within one minute.
 11. Turn the network off. Select **Save picture**. Check the error in the dialog and that the button reads **Try again**. Turn the network on and select **Try again**. Check that the account has one picture.
 12. In the phone app, open **Me**. Check that **Change picture** and **Remove picture** work with the phone camera and gallery, and that the page has no horizontal scroll at 390 × 844.
@@ -315,15 +329,15 @@ A page reload discards an unsent draft. The drafts stay only during the automati
 1. As staff, add a public reply and an internal note to the same issue.
 2. As the contestant, check that the public reply shows and the internal note does not show.
 3. Add a staff-only image and a team-visible image. As the contestant, check that only the team-visible image shows.
-4. Repeat the privacy check through direct API and history queries.
+4. Repeat the privacy check with a direct API read of the snapshot as the contestant.
 
 ### Real devices
 
 Use a real phone and a screen reader when available.
 Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 
-**Live** shows a subscribed Realtime connection.
-**Reconnecting** shows that the connection is down and the app tries again.
+**Live** shows that the live channel is connected.
+**Reconnecting** shows that the channel is down and the app tries again.
 
 ## 8. Temporary passwords and recovery
 
@@ -337,25 +351,25 @@ Review the contestant, jury and admin views at 1280 × 800 and at 200% zoom.
 8. Verify the requester's identity as admin.
 9. Reset that account.
 10. Give the replacement temporary password to the account holder through a secure channel.
-11. Check that old sessions and refresh tokens lose access.
+11. Check that the account's earlier sign-ins lose access.
 12. Sign in again with the replacement temporary password.
 13. Change that temporary password.
 14. Check that access returns.
 15. Dismiss the displayed credentials.
 16. Check that existing passwords are not visible.
-17. Attempt to create a duplicate username.
-18. Check that the app rejects it.
-19. Attempt a password reset as a non-admin.
-20. Check that the app rejects it.
-21. Assign a username to an existing development account.
-22. Check that its password and account ID remain unchanged.
+17. Attempt to create a duplicate username in **Add people**.
+18. Check that the form names the line and the server refuses a repeat.
+19. Attempt a password reset through the API as an account with no admin authority.
+20. Check that the server rejects it.
+21. Change the username of a test staff account with **Change username**.
+22. Check that its account ID and password remain unchanged.
 
 ## 9. Concurrent actions and isolation
 
 1. Compare two simultaneous claims.
 2. Compare two simultaneous awards.
 3. Check state after refresh and reconnect.
-4. Attempt unauthorized queries across teams and sessions.
+4. Attempt unauthorized API reads across teams and contests.
 
 ## 10. Issue images
 
@@ -393,10 +407,10 @@ Use an active event unless a step says the event is archived.
 30. Cause file deletion to fail. Check that the app reports the failure and shows **Retry removal**.
 31. Refresh the page. Check that the uploader still has **Retry removal**, even though the image is no longer listed.
 32. Retry removal. Check that both stored files are gone and the retry control disappears.
-33. Start an upload, then remove that member's session access before completion. Check that unfinished-file access and completion fail.
+33. Start an upload, then select **Remove** for that member on **Assignments** before completion. Check that unfinished-file access and completion fail.
 34. Repeat with a password reset and with event archival.
 35. Start two uploads, then lower the count limit to one. Check that only one can become attached.
-36. Try a file path with an extra folder. Check that Storage refuses it.
+36. Send an upload request with a file path that has an extra folder. Check that the server refuses it.
 37. After an upload succeeds, check that the file control shows no chosen file. Check that the visibility choice is the same as before.
 38. Select **Add image** again without a new file. Check that the app asks for an image and that no second image appears.
 39. Choose another file. Check that the "Image added." message goes away.
@@ -410,18 +424,17 @@ Check delayed previews with two different images, A and B, in an isolated test:
 5. Repeat with Escape to close A. Check that focus returns to A's thumbnail before opening B.
 6. Fail the response for the current preview. Check that the error still appears.
 
-`tests/images.spec.ts` automates these response-order checks with the development image harness.
-It also checks that closing the preview releases its temporary browser URL.
+`tests/images.spec.ts` automates these response-order checks with mocked responses.
 These tests do not access hosted data.
 
 `tests/image-upload.spec.ts` automates steps 15, 27, and 37 to 39 on a phone with local storage.
 It also checks that a failed upload keeps its file for **Try the upload again**.
-It also checks that **Cancel upload** makes the visibility choice available again. It does not check that the unfinished files are deleted or that contestants cannot see the new image. Check those two results by hand (steps 28 and 29).
-It also checks that a lost completion response does not attach the image twice.
+It also checks that **Cancel upload** makes the visibility choice available again, and that a lost completion response does not attach the image twice.
+It does not check that the unfinished files are deleted or that contestants cannot see the new image. Check those two results by hand (steps 28 and 29).
 
 ## 11. Team search
 
-Use a volunteer or specialist account, then repeat the queue search as jury and as a session admin.
+Use a volunteer or specialist account, then repeat the queue search as jury and as a contest admin.
 Use a contestant account to confirm that team search stays hidden.
 
 1. Open the issue queue.
@@ -449,20 +462,19 @@ Use a contestant account to confirm that team search stays hidden.
 23. Sign in as a contestant.
 24. Check that **Report an issue** does not ask for a team.
 
-Expected result: the submission stores the chosen team's database id. Contestants remain limited to their own team. Jury members can filter the resolved queue and do not gain the other status filters.
+Expected result: the submission stores the chosen team's database ID. Contestants stay limited to their own team. Jury members can filter the resolved queue and do not gain the other status filters.
 
 Also check these regressions with isolated fixtures:
 
 - With locations `Desk 1234` and `Desk 1235`, `123` matches neither. `1234` and `001234` match only the first number. A spelling mistake in a word can still match beside an exact number.
-- Type a query with suggestions, then press Tab. Queue focus moves to **Status**; report-form focus moves to **Category**. The popup closes and no team is chosen. Arrow keys and Enter still choose a team; pointer selection still works.
-- Choose a team, Tab from the input to **Clear team**, and activate it with Enter, then repeat with Space in both controls. Both team fields clear, focus returns to the initiating input, and the queue shows all teams under the existing status filter. The report draft and category stay intact; **Submit issue** stays disabled until another team is chosen. Repeat clearing with a pointer.
-- Select a team as staff, then assign that account to a different contestant team. Trigger the normal refresh by focusing the window. The search disappears and the contestant's own issues remain visible without reloading.
-- Revoke access to the selected session while another session remains accessible. The automatic fallback clears the query and chosen team. Removing the chosen team from the next snapshot also clears it and disables staff submission until another team is chosen.
+- Type a query with suggestions, then press Tab. Queue focus moves to **Status**. Report-form focus moves to **Category**. The popup closes and no team is chosen. Arrow keys and Enter still choose a team, and pointer selection still works.
+- Choose a team, Tab from the input to **Clear team**, and activate it with Enter, then repeat with Space in both controls. Both team fields clear, focus returns to the initiating input, and the queue shows all teams under the existing status filter. The report draft and category stay intact, and **Submit issue** stays disabled until you choose another team. Repeat clearing with a pointer.
+- Revoke access to the selected contest while another contest stays accessible. The automatic fallback clears the query and the chosen team. Removing the chosen team from the next snapshot also clears it and disables staff submission until you choose another team.
 
-`tests/team-search.spec.ts` runs the focus and refreshed-snapshot checks using mocked Auth and session responses.
+`tests/team-search.spec.ts` runs the focus and refreshed-snapshot checks with mocked responses. It also checks that a refreshed contestant membership drops the staff team filter. The event console cannot turn a staff account into a contestant, so that case has no manual step.
 These fixtures do not connect to a hosted backend or verify database authorization.
 
-## 12. Workspace refresh and cloud fixture recovery
+## 12. Workspace refresh
 
 Use isolated test accounts for these checks.
 
@@ -471,39 +483,35 @@ Use isolated test accounts for these checks.
 3. Submit another issue from a second client.
 4. Check that the first client still shows the original issue and reply text.
 5. Send the reply. Check that it belongs to the original issue.
-6. Open a membership form as an administrator. Use **Manage** on **Accounts** in the desktop console, or an account in the **Session** tab.
-7. Change that member's roles or team from a second administrator account.
-8. Return focus to the first client so it receives the current membership.
-9. Check that both the summary and form show the current roles or team.
-10. Save the form. Check that it preserves the second administrator's change.
+6. Open an account as a contest admin. Use **Manage** on **Accounts** in the desktop console, or an account in the **Session** tab.
+7. Type a new username. Do not save it.
+8. From a second client, record a change in the same contest.
+9. Return focus to the first client so it reads the current snapshot.
+10. Check that the dialog stays open and the typed username stays.
 
 The credential-free tests in `tests/workspace-refresh.spec.ts` cover these UI effects and exact write requests.
 
-Record observed results in [run log](history/run-log.md).
-Suggested manual checks are not completed checks.
-Browser automation does not establish results for real devices, assistive technology, or capacity.
+## 13. Jury worklist
 
-## 13. Jury worklist (T0009)
+Confirm your isolated test target before you create fictional accounts and records with UUIDs.
+Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, combined jury and support, support-only, admin-only, and contestant accounts. Do not use real contest reports as fixtures.
 
-Run these checks on the current T0009 revision after merging current `main`.
-For hosted acceptance, confirm your isolated test target before creating UUID-owned fictional accounts and records.
-Delete only that run's fixtures. Verify cleanup after the run. Use jury-only, combined jury/support, support-only,
-admin-only, and contestant accounts. Do not use real contest reports as fixtures.
-This is a checklist, not evidence that hosted or physical-device checks have passed.
+The worklist is the phone **Awards** tab and the desktop **Award review** page. It has these lists:
 
-T0015 moved the worklist into the phone **Awards** tab and the desktop **Award review** page.
-The lists are **To decide**, **To apply** and **Applied**. There is no separate **Jury worklist** entry.
+- **To decide** holds resolved issues without an award, oldest resolution first.
+- **To apply** holds every award that waits for external application, oldest decision first. This includes zero-minute awards and awards on reopened issues.
+- **Applied** holds resolved issues with an applied award, latest confirmation first.
+
 See [frontend architecture](frontend-architecture.md#jury-award-lists).
 
 1. As jury or a combined-role member, open **Awards** on a phone or **Award review** in the desktop console.
    Other roles must not have this entry. Admin alone does not grant jury powers.
 2. Prepare resolved issues without decisions, a zero-minute pending award, a
    pending award on a reopened issue, an applied award, and a reopened issue with
-   no award. Compare **To decide** and **To apply** and their counts with the specification's
-   eligibility table. Order decisions by resolution time and applications by award time.
-   Check that **Applied** shows the applied award, latest confirmation first.
+   no award. Compare **To decide**, **To apply**, **Applied**, and their counts with the rules above.
+   Check that the reopened issue with no award appears in none of the lists.
 3. As a combined-role member, filter the ordinary queue by team, then open the award lists.
-   The lists must still cover the entire authorized session.
+   The lists must still cover the entire contest.
    Return to the queue. Check that its filter and selected issue remain.
 4. Check the team, location, status, resolution summary, resolver and time, and the unresolved duration.
    A pending award on a reopened issue shows a **Reopened** badge with the current status.
@@ -521,42 +529,39 @@ See [frontend architecture](frontend-architecture.md#jury-award-lists).
    leaves **To apply** in the other. Check refresh and reconnect. Use the automated retry
    cases to verify that lost award and confirmation responses reuse the request ID.
    Confirm one award, one confirmation, and one history entry for each action.
-8. Switch sessions. Check that the records belong only to the next session.
+8. Switch contests. Check that the records belong only to the next contest.
    Losing the jury role removes the award lists. Losing membership clears protected records.
-   Password setup and reset must keep the existing account-readiness gate.
+   A password reset must still block the account until it sets a new password.
 9. Check the award lists with the keyboard only. Check that a reopened issue without an award leaves **To decide**.
    Archived records remain readable while decisions and confirmations are unavailable.
 10. Check the desktop console at 1280 × 800, the phone app at 390 px and 320 px, native browser 200% zoom, and screen-reader
     labels. No text or control should clip or cause horizontal overflow. Distinguish
     loading and read errors from valid empty lists. Failed reads must clear stale data.
 
-Record results and remaining limits in [run log](history/run-log.md#t0009-parallel-maintenance-2026-10-18).
-
 ## 14. Browser routes and workflow retry recovery
 
-Use isolated fictional accounts for these checks. These steps do not authorize hosted fixture creation.
+Use isolated fictional accounts for these checks.
 The [frontend architecture](frontend-architecture.md#browser-routes) lists paths and required roles.
 
 1. Open `/jury` while signed out. Sign in as a jury member. Check that the award screen opens.
-2. Refresh the page. Check that the address remains `/jury` and current session data loads.
+2. Refresh the page. Check that the address remains `/jury` and current contest data loads.
 3. Open the queue, award screen, and account screen. Use browser Back and Forward. Check each address and screen.
 4. In the phone app, open **Change password** from **Me**. Check cancellation and completion. Both must retain `/account`. In the console and the contestant app, change the password in the **Security** section. Check that the address stays `/account`.
 5. As support staff, open `/administration`. Check that the app returns to `/issues` without administration data.
-6. Remove a jury or administrator role in another isolated client. Refresh access. Check that the restricted section closes.
+6. Remove a jury or contest admin role on **Assignments** in another isolated client. Refresh access. Check that the restricted section closes.
 7. Repeat navigation in the organizer phone layout. Check keyboard focus after a tab change and after a return from an issue.
-8. Use the existing fictional-response retry cases to interrupt a workflow response and account check.
+8. Use the retry cases in `tests/workflow-session-retry.spec.ts` to interrupt a workflow response and an account check.
    Check that protected content hides while the account check fails.
-   After recovery, select **Retry last request**. Check that it reuses the original actor, session, request ID, and command.
-9. Repeat with access to the original session removed. Check that the retry reaches that session's server access check.
+   After recovery, select **Retry last request**. Check that it reuses the original actor, contest, request ID, and command.
+9. Repeat with access to the original contest removed. Check that the retry reaches that contest's server access check.
 10. Sign out while a response is pending. Sign in with another account. Check that no old request or protected record remains.
 
 A full reload discards in-memory drafts, filters, and retry metadata.
-Record observed results separately from these instructions. Historical runs do not verify the combined frontend.
 
-## 15. Session announcements (T0006)
+## 15. Session announcements
 
-Use an active event with an admin, a jury member, a volunteer, and a contestant.
-Use two browser windows for the live checks. Run these checks after a reviewed deployment.
+Use an active event with a contest admin, a jury member, a volunteer, and a contestant.
+Use two browser windows for the live checks.
 
 1. As the admin, publish an announcement with a title, details, and no expiry.
    Check that the contestant and volunteer see the title above the workspace without a refresh.
@@ -590,7 +595,7 @@ Use two browser windows for the live checks. Run these checks after a reviewed d
 
 Run these checks in a window of 1280 by 800 px, in the light and dark themes.
 Run the phone checks at 390 by 844 px.
-Use a development or test session with staff and contestant accounts.
+Use a test contest with staff and contestant accounts.
 
 1. Open the issue queue in the desktop console. Select each status tab with the mouse.
    Check that the white pill slides and resizes to the selected tab, with no jump.

@@ -1,6 +1,6 @@
 # Webmaster, event, and contest platform
 
-**Status.** Implemented. All eight phases are merged. Phase 1, `feature/scoped-authority`, implements the contest resolver, migration `0017`, and its gate. The local half of the gate passed. The hosted runs were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the owner accepted the gate on 2026-11-02. The [gate record](history/scoped-authority-gate.md) holds the measurements and the decision. Phase 2, `feature/webmaster-management`, implements webmaster management with no migration. Both phases are merged. Phase 3, `feature/event-sign-in`, implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 1 merged as #152, Phase 2 as #153, and Phase 3 as #156. Phase 4, `feature/event-console`, implements migration `0019`, the event console, and the one-webmaster bootstrap. It merged as #161. Phase 5, `feature/contest-clock`, implements migration `0020`, contest schedules, derived intake, personal end times, contest-wide awards, and the calendar. It was rehearsed on 2026-11-05 and merged as #163. Migration `0021` added withdrawal of an unconfirmed contest-wide award and merged as #171. Phase 6, `feature/live-credentials`, implements migration `0022` and merged as #174. Phase 7, `feature/event-deletion`, implements migration `0023` and the permanent deletion of an event. It merged as #186. Phase 8, `feature/deletion-guards`, implements migration `0024`, the three delete guards. It merged as #191. Migration `0025`, `feature/issue-award-withdrawal`, adds withdrawal of an unconfirmed issue award. It merged as #194.
+**Status.** Implemented. All eight phases are merged on `main`. Phase 1 implements the contest resolver and migration `0017`. Phase 2 implements webmaster management with no migration. Phase 3 implements migration `0018`, sign-in by event code or site and handle, and `set_handle`. Phase 4 implements migration `0019`, the event console, and the one-webmaster bootstrap. Phase 5 implements migration `0020`, contest schedules, derived intake, personal end times, contest-wide awards, and the calendar. Migration `0021` adds withdrawal of an unconfirmed contest-wide award. Phase 6 implements migration `0022`, practice and live contests, the live password gate, and batched live credentials. Phase 7 implements migration `0023` and the permanent deletion of an event. Phase 8 implements migration `0024`, the three delete guards. Migration `0025` adds withdrawal of an unconfirmed issue award. The hosted runs of the Phase 1 gate were inconclusive against the 10 percent p95 rule, because `main` itself varied between runs. After a compile-time fix, the branch read faster than `main` at the median, and the maintainers accepted the gate on 2026-11-02. The [gate record](measurements/scoped-authority-gate.md) holds the measurements and the decision.
 
 Phase 1 differs from this page and the sketches in these points:
 
@@ -74,7 +74,7 @@ Phase 4 differs from this page and the sketches in these points:
 
 Phase 5 differs from this page and the sketches in these points:
 
-- `ContestSummary` keeps its Phase 4 flat shape and gains `eventName`, `timeZone`, `contestType`, `schedule`, `intake`, and `canOpen`. `canOpen` replaces the sketch's `seat`, because a calendar row needs only whether the caller can open the contest. `kind` waits for Phase 6.
+- `ContestSummary` keeps its Phase 4 flat shape and gains `eventName`, `timeZone`, `contestType`, `schedule`, `intake`, and `canOpen`. `canOpen` replaces the sketch's `seat`, because a calendar row needs only whether the caller can open the contest. Phase 6 adds `kind`.
 - `/api/contests` with no query gives each contest the caller's own intake, so a contestant with confirmed extra time sees `running` or `grace` after the scheduled end, as the snapshot's clock says. It uses `viewerExtraSql`, the helper that the snapshot uses, and reads the minutes once for each contest in a materialized `viewer` row. Measured on the schedule fixture, a contestant's read went from 12 rows to 14 without a schedule, 16 with one and 17 with one confirmed award. Staff went from 24 rows to 28. `{eventId}` and `{window}` give the intake of the contest alone. `/api/contests` with `{eventId}` still lists only the contests that the caller can open. `{window}` lists the scheduled contests of the caller's own event that overlap the window, with `canOpen` false for a contest without a seat. A webmaster gets every event. A window is at most 92 days and returns at most 500 contests. A member's read uses `sessions_event_schedule` and a webmaster's uses `sessions_ends`, in two statements. A contest with no schedule is listed only by `{eventId}`.
 - The snapshot's `clock` uses snake_case like the rest of the snapshot, and adds `follows_schedule`. `session.intake_open` now holds the derived value for the viewer, which is the personal value for a contestant. A contestant reads only the contest-wide awards that staff confirmed, and staff read all of them.
 - The SQL fragments take the extra minutes as an expression, `intakeOpenSql(s, extra)`, `intakeStateSql(s, extra)`, and `personalEndSql(s, extra)`, and not an entry. A reader computes the minutes once with `extraMinutesSql(s, entry)` and passes the value. `clockSql` is new. The snapshot reads the minutes in one materialized row, which it joins once. A scheduled contestant snapshot read 126 rows, against 112 without a schedule and the ceiling of 130. Before the join, the same snapshot read 132.
@@ -139,7 +139,7 @@ A Worker rollback after Phase 3 loses these:
 - A legacy account whose handle changed signs in there with its old username. If another account later took that old handle, the old username still opens the legacy account there (`previousWorker.test.ts`).
 - The previous Worker ignores event codes and time zones, and its sign-in form asks for no event code.
 
-This page explains how one shared Minsky installation can host the events of many organizers. It settles GitHub issues #119 and #136 under the owner's decisions of 2026-10-27, which [PLAN.md](../PLAN.md) records. It supersedes the [earlier multi-competition design](history/multi-competition-design.md).
+This page explains how one shared Minsky installation can host the events of many organizers. It settles GitHub issues #119 and #136 under the owner's decisions of 2026-10-27, which [PLAN.md](../PLAN.md) records. It supersedes an earlier multi-competition design, which proposed one installation per organization.
 The [sketches page](event-platform-sketches.md) holds the full type sketch and migration sketch.
 Every `path:line` citation refers to `main` at `f90b1f5`.
 Every SQL check that this page names ran in local SQLite 3.51, not D1. Nothing on this page was measured on D1.
@@ -172,11 +172,11 @@ The owner's 2026-10-27 decisions add webmasters above events and event admins ab
 - D1 cascades never reach R2 or Durable Object storage. The only complete deletion is fixture-only (`tests/providers/cloudflare/fixture.ts:342-407`, `src/server/adapters/cloudflare/live.ts:260-263`). Test cleanup deletes events and accounts directly (`src/server/adapters/d1/testFixture.ts:205-207`).
 - The old `adminCondition` lets a contest admin reset any account whose every contest the admin also administers (`src/server/adapters/cloudflare/authentication.ts:194-199`). On a one-contest site, that includes a webmaster. A rolled-back Worker keeps that rule.
 
-This design replaces these sections of the [earlier design](history/multi-competition-design.md): "Names and levels", "Rosters", "Authority", "Audit", "Setup module", "Type sketch", "Migration sketch", and "Delivery phases". It keeps that page's contest kinds and its reason for fresh live passwords. The module map lists every superseded statement.
+This design replaces these sections of the earlier design: "Names and levels", "Rosters", "Authority", "Audit", "Setup module", "Type sketch", "Migration sketch", and "Delivery phases". It keeps that page's contest kinds and its reason for fresh live passwords. The module map lists every superseded statement.
 
 ## How each person uses the platform
 
-This section describes the target behavior from each person's view. Phases 1 to 6 are merged, and Phase 7 is built.
+This section describes the behavior from each person's view. All eight phases are built.
 
 ### Quickstart for an organizer
 
@@ -306,7 +306,7 @@ SELECT json_object(
 ) AS snapshot FROM login LEFT JOIN access c ON true`;
 ```
 
-Only the `access` line and the new sections change. Each section reads `c`, the one resolver row in the FROM clause. D1 compiles every statement on every call, and SQLite compiles a CTE again at each place that names it. So a section that names `access` again adds a compile of the resolver to every snapshot. See [the diagnosis of the read gate](history/scoped-authority-gate.md#diagnosis). `contestDataSql` keeps the column names that embedders read from `CurrentAccessRow` (`src/server/adapters/cloudflare/application.ts:9-26`), and its bindings keep the order of `currentAccessBindings` (`src/server/adapters/cloudflare/application.ts:58-60`). `contestDataSql` is the only export of the contest resolver. The unfiltered row stays private to `authority.ts`, so an embedder cannot skip the webmaster restriction.
+Only the `access` line and the new sections change. Each section reads `c`, the one resolver row in the FROM clause. D1 compiles every statement on every call, and SQLite compiles a CTE again at each place that names it. So a section that names `access` again adds a compile of the resolver to every snapshot. See [the diagnosis of the read gate](measurements/scoped-authority-gate.md#diagnosis). `contestDataSql` keeps the column names that embedders read from `CurrentAccessRow` (`src/server/adapters/cloudflare/application.ts:9-26`), and its bindings keep the order of `currentAccessBindings` (`src/server/adapters/cloudflare/application.ts:58-60`). `contestDataSql` is the only export of the contest resolver. The unfiltered row stays private to `authority.ts`, so an embedder cannot skip the webmaster restriction.
 
 #### Sign-in in the browser and on the server
 
@@ -402,7 +402,7 @@ Isolation is built in, in three layers. The first lives in D1 triggers, the seco
 - An event admin may manage any other account of the event. Webmasters have no event, so an event admin never manages one.
 - A contest admin may manage an account that holds no grant and whose every assignment is a contest that the admin administers in an unarchived event.
 
-This keeps T0003's "admin of every affected session" rule (`src/server/adapters/cloudflare/authentication.ts:195-199`) for contest admins, and adds the levels above them. D1 repeats the core of the rule for every Worker version. `account_operation_takeover` refuses a reset or rename of a webmaster by anyone but a webmaster. It also refuses a change to an event admin by anyone but a webmaster or an event admin of that event. Every admin issue and rename inserts an `account_operations` row in the same batch as its writes (`src/server/adapters/cloudflare/authentication.ts:241-242`, `src/server/adapters/cloudflare/authentication.ts:263-268`). So a refusal rolls the whole batch back. An actor may act on the own account, which keeps `change_password` and trusted recovery working (`src/server/adapters/cloudflare/installation.ts:170-171`, `src/server/adapters/cloudflare/adminRecovery.ts:131`).
+This keeps the existing "admin of every affected session" rule (`src/server/adapters/cloudflare/authentication.ts:195-199`) for contest admins, and adds the levels above them. D1 repeats the core of the rule for every Worker version. `account_operation_takeover` refuses a reset or rename of a webmaster by anyone but a webmaster. It also refuses a change to an event admin by anyone but a webmaster or an event admin of that event. Every admin issue and rename inserts an `account_operations` row in the same batch as its writes (`src/server/adapters/cloudflare/authentication.ts:241-242`, `src/server/adapters/cloudflare/authentication.ts:263-268`). So a refusal rolls the whole batch back. An actor may act on the own account, which keeps `change_password` and trusted recovery working (`src/server/adapters/cloudflare/installation.ts:170-171`, `src/server/adapters/cloudflare/adminRecovery.ts:131`).
 
 **Last webmaster.** Two triggers count the enabled webmasters. One refuses deleting the last grant, and one refuses disabling the last account.
 
@@ -653,7 +653,7 @@ It deletes these items:
 | `cleanup()` and the fixture name check (`src/server/adapters/cloudflare/live.ts:245-285`); the two-ID `maintainFixtureSessions` schema (`src/server/adapters/cloudflare/live.ts:365-387`) | Superseded by `/erase` and the journal |
 | `AssignByIdForm` (`src/organiser/admin/AccountForms.tsx:364`) and the five contest pickers (`src/organiser/desktop/ConsoleChrome.tsx:122-163`, `src/organiser/phone/PhoneTabs.tsx:539-565`, `src/connected/AccountSections.tsx:303-355`, `src/contestant/ContestantTopBar.tsx:82-110`, `src/screens/NoSessionAccess.tsx:99-117`) | Assignment comes from the event's lists; one `ContestPicker` |
 
-From the [earlier design](history/multi-competition-design.md), this design supersedes these statements:
+From the earlier design, this design supersedes these statements:
 
 - "Minsky deletes no contest data and has no data reset" (now true for everything but whole events).
 - "Names and levels" and "One installation holds one organization, so the global username rule is correct".
@@ -687,7 +687,7 @@ It keeps the practice and live kinds, the reason for fresh live passwords, batch
 
 **Promotion of the two development accounts.**
 
-- **Rule.** `0017` gives a site grant to the accounts whose username is `organizer` or `playtest-admin`, by name (decision 1). Usernames are globally unique (`src/server/adapters/d1/migrations/0003_authentication.sql:5`), so the rule matches at most two accounts. A matching account must also be a contest admin and hold no team seat. So a self-hosted team or volunteer that uses one of these names is not promoted. On a database without them, it promotes nobody. The repository names `organizer` as the development owner (`docs/activate-cloudflare-development.md:36`). The owner supplied `playtest-admin`. The repository does not mention it, and it passes the username CHECK (`src/server/adapters/d1/migrations/0003_authentication.sql:2-4`). No count or query runs before the merge.
+- **Rule.** `0017` gives a site grant to the accounts whose username is `organizer` or `playtest-admin`, by name (decision 1). Usernames are globally unique (`src/server/adapters/d1/migrations/0003_authentication.sql:5`), so the rule matches at most two accounts. A matching account must also be a contest admin and hold no team seat. So a self-hosted team or volunteer that uses one of these names is not promoted. On a database without them, it promotes nobody. `organizer` is the development webmaster. The owner supplied `playtest-admin`. The repository does not mention it, and it passes the username CHECK (`src/server/adapters/d1/migrations/0003_authentication.sql:2-4`). No count or query runs before the merge.
 - **Reach.** `0017` runs on every database that applies the repository's migrations. These are all of them:
   - `minsky-development`, through the `minsky-dev` Workers Builds trigger after the merge (`AGENTS.md:65`). It promotes `organizer` and `playtest-admin`.
   - `minsky-preview`, when an agent applies migrations to it. It holds only test data. An account there with either username becomes a webmaster.
@@ -970,4 +970,4 @@ These changes are outside this page and wait for later pull requests:
 
 ## Next implementation step
 
-Write `authority.ts` with the contest resolver, and serve today's `currentAccessSql` and `currentAccessForLoginsSql` exports from it. Run `queryPlans.test.ts`, `readVolume.test.ts`, and `npm run perf:reads` on `main` and on the branch with `0017` applied, before any caller changes. Then run the hosted half of the Phase 1 gate on `minsky-preview`.
+Phase 7, `feature/event-deletion`, is the next phase in [Delivery phases](#delivery-phases).

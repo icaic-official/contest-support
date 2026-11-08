@@ -12,7 +12,7 @@ import { contestDataSql } from '../cloudflare/authority';
  * (r = 0.98 over 42 statements). SQLite compiles a common table expression again
  * at each place that names it, so a reader that names the resolver in each section
  * pays the resolver's compile on every call, once per section. At 200 users that
- * D1 time delayed every request. docs/history/scoped-authority-gate.md has the numbers.
+ * D1 time delayed every request. docs/measurements/scoped-authority-gate.md has the numbers.
  *
  * The share is the compile time that the resolver adds to a reader, counted in
  * compiles of the resolver alone. Both come from this process, so machine speed

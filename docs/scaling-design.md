@@ -2,23 +2,24 @@
 
 **Status.** Measured baselines and a partly implemented plan.
 Scale-up items 1, 2 and 6 are implemented. Items 4 and 5 are partly implemented. Items 3, 7, 8 and 9 are open. The [status table](#status-of-the-plan) gives the commits.
-Nobody has run a hosted load test since these changes. No tested build has reached the 800-user target, and the current code is not tested on a hosted installation.
+Nobody has run the full load steps on a hosted installation since 2026-10-25. Hosted comparison runs on 2026-11-01 and 2026-11-02 reached at most 200 simulated users on small preview installations. No tested build has reached the 800-user target, and the current code is not tested on a hosted installation.
 
 This page explains where Minsky's Cloudflare installation saturates under contest load, and ranks the changes that raise its capacity.
 It covers two directions:
 
 - Scale-up: one contest with more simultaneous users.
-- Scale-out: many contests and organizations on one hosted service.
+- Scale-out: many contests and organizers on one hosted service.
 
 The targets are 800 simultaneous users per contest, 95% of ordinary actions within 2 seconds, and live updates within 3 seconds ([product direction](product-direction.md)).
-Two kinds of measurement exist:
+Three kinds of measurement exist:
 
-- A hosted load test on 2026-10-25, of builds based on `5792530`. [Run a load test](run-load-tests.md) explains the harness. The dated record of the runs is in the [run log](history/run-log.md#load-test-baseline-2026-10-25). The code has changed since then, so this page keeps those results as a dated record.
-- Local read counts on 2026-10-26, from `npm run perf:reads`. They count the D1 rows that each request reads, on `main` at `f978488` and after the read reductions at `247e4a7`. The [read-volume baseline](history/read-volume-baseline-2026-10-26.md) records the method and the first run. [Rerun the measurement](history/read-volume-baseline-2026-10-26.md#rerun-the-measurement) gives the commands.
+- A hosted load test on 2026-10-25, of builds based on `5792530`. [Run a load test](run-load-tests.md) explains the harness. The code has changed since then, so this page keeps those results as a dated record.
+- Local read counts on 2026-10-26, from `npm run perf:reads`. They count the D1 rows that each request reads, on `main` at `f978488` and after the read reductions at `247e4a7`. The [read-volume baseline](measurements/read-volume-baseline-2026-10-26.md) records the method and the first run. [Rerun the measurement](measurements/read-volume-baseline-2026-10-26.md#rerun-the-measurement) gives the commands.
+- Hosted comparison runs on 2026-11-01 and 2026-11-02, with at most 200 simulated users. They compare `feature/scoped-authority` with its merge base (`d4c0232` and `6ecc656` on 2026-11-02). Both verdicts are inconclusive, and the runs do not establish capacity. The [scoped authority gate](measurements/scoped-authority-gate.md) records them.
 
 Each claim carries a label:
 
-- **Measured, hosted** means a number from the 2026-10-25 run on the isolated `minsky-preview-load` installation, or from Cloudflare analytics for that installation.
+- **Measured, hosted** means a number from the 2026-10-25 run on the isolated `minsky-preview-load` installation, or from Cloudflare analytics for that installation. A number from a later run names its date.
 - **Measured, local** means a number that `npm run perf:reads` printed on a seeded local D1 database. The counts are rows and D1 calls. They are not time, and they are not capacity.
 - **Inferred** means reasoning from measured numbers and the code at `247e4a7`. Nobody measured it directly.
 - **Documented** means a statement in the Cloudflare documentation, read on 2026-10-26. The link follows the claim.
@@ -27,7 +28,7 @@ Each claim carries a label:
 
 The hosted run of 2026-10-25 found these limits (measured, hosted, on builds based on `5792530`):
 
-1. **The live channel saturated first.** Each contest session has one Durable Object, and it handled every notification and every new connection one at a time. With the sign-in fix, it was busy 60 seconds of every minute at 50 users. Only 56% of screens showed a change within 3 seconds. At 100 users, none of the 50 new WebSocket connections opened.
+1. **The live channel saturated first.** Each contest has one Durable Object, and it handled every notification and every new connection one at a time. With the sign-in fix, it was busy 60 seconds of every minute at 50 users. Only 56% of screens showed a change within 3 seconds. At 100 users, none of the 50 new WebSocket connections opened.
 2. **D1 throughput was the second limit.** Each Worker request ran about 40 D1 queries, because Better Auth checked the database schema on every request. D1 queries stopped rising at about 3,200 per second while Worker requests rose to about 80 per second. At 200 users the Worker returned `503`. The cause of those responses is not confirmed.
 3. **Turning off that schema check removed 90% of the D1 queries** (in a throwaway prototype). Queries fell from 40 to 4.2 per request, and the prototype served 119 requests per second at 200 users. The live channel then limited the run again.
 4. **Creating accounts flooded the live channel.** Setup of 1,200 accounts left 4,291 notifications. They took 49 minutes to deliver, and new connections hung for about 8 minutes of that time.
@@ -54,20 +55,20 @@ The installation had its own Worker, D1 database, R2 bucket, Durable Object name
 It used the configuration that `cloudflare:install configure` generates, with Worker placement `aws:ap-southeast-1`, D1 location hint `apac`, `cpu_ms: 1000`, and a cron every minute.
 D1 reported that the APAC primary served requests from Hong Kong (`served_by_colo: HKG`).
 Bootstrap created 480 fictional teams. `npm run load -- setup` created 240 staff accounts with the volunteer role and 960 team accounts, two for each team.
-The installation was deleted after the runs. The [run log](history/run-log.md#load-test-baseline-2026-10-25) lists every resource that was created and deleted.
+The installation was deleted after the runs.
 
 ### Builds
 
 On `main` at `5792530`, one IP address could sign in only 50 times in 15 minutes, so one machine could not sign in 800 accounts.
-Every build therefore included the uncommitted `bugfix/signin-failure-limits` work as a throwaway patch (SHA-256 of the exported diff `3e42da8e18ffa808…`). It counts only failed sign-ins, with 200 for each IP address and 10 for each username in 15 minutes.
+Every build therefore included a throwaway patch (SHA-256 of the exported diff `3e42da8e18ffa808…`). It counts only failed sign-ins, with 200 for each IP address and 10 for each username in 15 minutes.
 
 | Build | Source |
 | --- | --- |
 | Baseline | `5792530` and the sign-in patch |
-| B2+B3 | Baseline, `c5137a7` (`perf/live-batched-access`), and `7a17502` (`perf/history-index`, PR #84) |
+| B2+B3 | Baseline, `c5137a7` (B2, which reads all socket grants in one query), and `7a17502` (B3, which adds the history index) |
 | Prototype | B2+B3 and one line in `identity.ts`: `advanced: { database: { validateSchema: false } }` |
 
-After the runs, PR #86 merged the sign-in limits with the same policy, and PRs #84 and #93 merged B3 and B2. `main` at `61f17ad` was therefore close to the B2+B3 build. It also had Workers Logs from PR #85 and security headers from PR #90, which these runs did not include.
+After the runs, `main` received the sign-in limits with the same policy, then B3 and B2. `main` at `61f17ad` was therefore close to the B2+B3 build. It also had Workers Logs and security headers, which these runs did not include.
 
 ### Load
 
@@ -85,14 +86,14 @@ These checks rule out the harness and the network:
 - The harness received at most 3.1 MB per second of decoded response bodies. The machine downloaded 10.5 MB per second from Cloudflare before the runs.
 - Cloudflare counted 1,942 to 7,499 Worker requests per minute. That matches the harness's own request rate, so the requests reached the Worker.
 
-Other agents shared the machine. Its load average was 0.3 to 28 during the runs. Each build ran its step sequence once, so the numbers have no run-to-run spread. Treat differences under about 20% as noise.
+Other processes shared the machine. Its load average was 0.3 to 28 during the runs. Each build ran its step sequence once, so the numbers have no run-to-run spread. Treat differences under about 20% as noise.
 
 ### Local read counts
 
 `npm run perf:reads` runs the real application Worker in Node against a local D1 database. It counts the D1 calls, statements and rows of each request.
 The base shape has 1,200 accounts, 24 teams, 100 issues with 5 history rows and 3 images each, and a ready profile picture for every account. The full plan also changes one size at a time, up to 4,800 accounts, 400 issues and 480 teams.
 The counts repeat exactly on the same data. Rows read on local D1 should match hosted D1, because both use SQLite (inferred). Nobody compared them on a hosted database.
-The [read-volume baseline](history/read-volume-baseline-2026-10-26.md#method) describes the callers, the seed and the checks of the measurement.
+The [read-volume baseline](measurements/read-volume-baseline-2026-10-26.md#method) describes the callers, the seed and the checks of the measurement.
 
 ## Results
 
@@ -154,7 +155,7 @@ Rows read include the notification dispatch after a `POST` and the claim in the 
 | `GET /api/auth/session` | Any | 5 | 5 | Flat |
 
 Without the dispatch, the claim request reads 3,541 rows before and 2,648 after, the submit request reads 323 and 179, and the cron tick reads 7,877 and 21 (measured, local).
-The 4,800-account avatar count of 33,616 at `f978488` is inferred from the measured slope of 7 rows for each ready avatar. The avatar statement alone read 33,611 rows at that size ([read-volume baseline](history/read-volume-baseline-2026-10-26.md#h1-avatar-list)). The count of 30 at 4,800 accounts is measured, local, with migration `0016_staff_membership_index.sql`.
+The 4,800-account avatar count of 33,616 at `f978488` is inferred from the measured slope of 7 rows for each ready avatar. The avatar statement alone read 33,611 rows at that size ([read-volume baseline](measurements/read-volume-baseline-2026-10-26.md#h1-avatar-list)). The count of 30 at 4,800 accounts is measured, local, with migration `0016_staff_membership_index.sql`.
 
 Every live hint makes each open screen read `/api/contests`, `/api/snapshot`, `/api/announcements` and `/api/avatars` again. The sum of those four reads is the cost of one screen for one hint (measured, local parts, inferred sum):
 
@@ -178,7 +179,7 @@ Evidence (measured, hosted, on builds based on `5792530`):
 - On the baseline at 50 users, the Durable Object was busy 59.8 seconds of each minute. It used only 0.48 seconds of CPU in that minute, so it spent the time waiting for D1, not computing.
 - The `change` hint reached other screens after a median of 1.35 seconds and a 95th percentile of 5.0 seconds, with only 0.16 commands per second.
 - At 100 users, all 240 connection attempts from the 50 new users timed out.
-- `perf/live-batched-access` (B2) reads all socket grants in one query. It raised delivery within 3 seconds at 50 users from 56% to 97%. At 100 users the object was again busy the whole minute, and 193 connection attempts timed out.
+- B2 reads all socket grants in one query. It raised delivery within 3 seconds at 50 users from 56% to 97%. At 100 users the object was again busy the whole minute, and 193 connection attempts timed out.
 - The same saturation stopped the prototype at 200 users, even with 90% fewer D1 queries in the Worker.
 - Connections alone filled the object. In a prototype run with `--issues-per-team-hour=0`, 200 users signed in over 60 seconds with only 19 leftover staff commands. 50 sockets opened, and the other 150 users' 416 attempts timed out.
 
@@ -206,8 +207,8 @@ Migration `0014_notification_claims.sql` changes three of these causes:
 - It adds the index `notifications_claim_order`. The claim reads 12 to 13 rows when rows are pending, and 3 rows in an idle cron tick (measured, local).
 - With the claim of `83849fc`, one dispatcher sends up to 500 rows in each round, as one request for each session.
 
-Nobody has measured account setup on a hosted installation since these changes.
-A future bulk import or a roster copy (PR #80) does the same account work in larger batches.
+In the [hosted rerun](measurements/scoped-authority-gate.md#hosted-rerun) of 2026-11-02, setup of 200 accounts took about 3 minutes and left 0 notifications waiting (measured, hosted). Nobody has measured a setup of 1,200 accounts since these changes.
+The bulk commands `create_people` and `create_entrants` do the same account work in larger batches.
 A load test, or a contest, that starts during a backlog measures the backlog. [Run a load test](run-load-tests.md#create-the-fictional-accounts) waits until no undelivered rows remain. The harness preflight checks only that one socket opens.
 
 ### D1 ran about 40 queries for each request
@@ -268,7 +269,7 @@ In the B2+B3 run, actions at 50 users had a 95th percentile of 5.2 to 14.2 secon
 
 Since `8234216` an action is one request. The browser keeps the CSRF token of the login, and the command response carries the snapshot that the server reads after the commit.
 That snapshot is most of the rows of a command. It reads 2,606 of the 2,658 rows of a public reply (measured, local).
-Each request still makes several D1 round trips in sequence. On the 2026-10-25 installation the Worker and the D1 primary were in different cities (inferred). Nobody has measured the action latency since this change.
+Each request still makes several D1 round trips in sequence. On the 2026-10-25 installation the Worker and the D1 primary were in different cities (inferred). The load harness still reads the CSRF token and refreshes around each command, so no hosted run has measured this one-request action.
 
 ### Password hashing during the sign-in burst
 
@@ -316,10 +317,10 @@ Two changes outside the plan are also implemented:
    - The commit intended a 10-second refresh while the socket is down, but `DISCONNECTED_REFRESH_MS` was `60_000`. On 2026-11-08 it became `10_000`. A screen without a live channel now sends refresh reads 6 times as often. A connected screen is unchanged.
    - Expected gain: an idle user sends about 0.1 instead of 0.53 requests per second (0.53 measured, hosted, at 200 users, 0.1 inferred), so 800 idle users send about 80 instead of 420 requests per second.
 5. **Make an action one or two requests.** Partly implemented in `8234216`. The browser keeps the CSRF token, and the command response carries the snapshot, so an action is one request. The response still carries the full snapshot, not the changed issue.
-   - Remaining gain: a response with only the changed issue reads about 137 rows instead of about 2,600 for a volunteer (inferred from the one-issue prototype in the [read-volume baseline](history/read-volume-baseline-2026-10-26.md#h6-the-command-response-carries-the-whole-snapshot)). The client must then merge one issue into its state. This needs a frontend change.
+   - Remaining gain: a response with only the changed issue reads about 137 rows instead of about 2,600 for a volunteer (inferred from the one-issue prototype in the [read-volume baseline](measurements/read-volume-baseline-2026-10-26.md#h6-the-command-response-carries-the-whole-snapshot)). The client must then merge one issue into its state. This needs a frontend change.
 6. **Make reads independent of the number of accounts.** Implemented in `5aafc3c` and the read reductions. See [Some reads grow with the number of accounts](#some-reads-grow-with-the-number-of-accounts).
    - Gain: on the local seed, the volunteer snapshot reads 2,587 rows and the admin snapshot 6,187 (measured, local). On 2026-10-25 the snapshot read 11,500 to 17,000 rows with fewer issues (measured, hosted).
-   - Still open: the admin snapshot reads every member, 3 rows each. Reading members only on the page that shows them makes the other admin pages flat in members (inferred from the [read-volume baseline](history/read-volume-baseline-2026-10-26.md#h7-every-admin-refresh-carries-every-member)).
+   - Still open: the admin snapshot reads every member, 3 rows each. Reading members only on the page that shows them makes the other admin pages flat in members (inferred from the [read-volume baseline](measurements/read-volume-baseline-2026-10-26.md#h7-every-admin-refresh-carries-every-member)).
 7. **Send changes, not full snapshots.** Open. Return only rows whose revision passed the client's last revision. Each live change still makes every staff screen read a full snapshot.
    - Expected gain: snapshot bytes and rows grow with changes, not with all issues (inferred).
    - Smallest PR: a design note first, because the read must never show stale permissions.
@@ -328,11 +329,11 @@ Two changes outside the plan are also implemented:
    - Smallest PR: a configuration change on a test installation.
 9. **Spread the first sign-in burst.** Open. Hand out credentials in waves, or let team accounts keep their first password. The second is a product decision.
    - Expected gain: about three password hashes per first sign-in leave the burst (inferred from the code).
-   - Smallest PR: documentation for waves. The forced change needs an owner decision.
+   - Smallest PR: documentation for waves.
 
-B2 (PR #93) and B3 (PR #84) are on `main`. B2 raised delivery within 3 seconds at 50 users from 56% to 97%, and B3 adds the history index. Neither changed where the system saturated.
+B2 and B3 are on `main`. B2 raised delivery within 3 seconds at 50 users from 56% to 97%, and B3 adds the history index. Neither changed where the system saturated.
 
-The [read-volume baseline](history/read-volume-baseline-2026-10-26.md#causes-and-hypotheses) lists more candidates. Three of them are open:
+The [read-volume baseline](measurements/read-volume-baseline-2026-10-26.md#causes-and-hypotheses) lists more candidates. Three of them are open:
 
 - Reload the avatar list only on a session change, on the timer and after the person's own upload (H1). A picture change sends no live hint.
 - Read the token, login and account in one statement, so that every authenticated request makes 2 D1 calls fewer (H8). The risk is high, because cookie signature checks move out of Better Auth.
@@ -342,10 +343,10 @@ The [read-volume baseline](history/read-volume-baseline-2026-10-26.md#causes-and
 
 On 2026-10-26 a review read the Cloudflare documentation and compared the features with these limits. The statements about Cloudflare are documented, as that review read them, with a link where the review gave one. The statements about Minsky are inferred from the code.
 
-These features are useful, but they need an owner decision and change hosted resources:
+These features are useful, but they change hosted resources, so each one needs a maintainer decision:
 
 - **Choose the locations together, before you create production.** D1, R2 and Durable Objects take a location hint only when the resource is created ([D1 data location](https://developers.cloudflare.com/d1/configuration/data-location/), [R2 data location](https://developers.cloudflare.com/r2/reference/data-location/), [Durable Objects data location](https://developers.cloudflare.com/durable-objects/reference/data-location/)). Choose them with the Worker placement.
-- **Set `placement.region` next to the D1 primary.** [Workers placement](https://developers.cloudflare.com/workers/configuration/placement/) says that placement next to the database cuts D1 query latency from 20 to 30 ms to 1 to 3 ms. The 2026-10-25 installation used placement `aws:ap-southeast-1`, and its D1 primary reported `HKG` (measured, hosted). `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` also sets `aws:ap-southeast-1`. Nobody has checked where the development D1 primary is. Smart Placement needs traffic from several locations, so it fits one venue poorly (inferred from the same page).
+- **Set `placement.region` next to the D1 primary.** [Workers placement](https://developers.cloudflare.com/workers/configuration/placement/) says that placement next to the database cuts D1 query latency from 20 to 30 ms to 1 to 3 ms. The 2026-10-25 installation used placement `aws:ap-southeast-1`, and its D1 primary reported `HKG` (measured, hosted). `src/server/adapters/cloudflare/deploy/development.wrangler.jsonc` also sets `aws:ap-southeast-1`. Nobody has checked where the development D1 primary is. Smart Placement needs traffic from several locations, so it fits one venue poorly (inferred from the same page). In one hosted test in October 2026, Smart Placement ran the Worker in North America against a D1 database in Asia Pacific. The median request took 1,537 ms, and an explicit region near the database took 125 ms (measured, hosted).
 - **Use Workers traces with sampling** to measure rows read for each query on a hosted installation ([Workers traces](https://developers.cloudflare.com/workers/observability/traces/)). Cloudflare bills traces from 2026-12-01 ([observability pricing](https://developers.cloudflare.com/observability/pricing/)).
 
 These changes are in code only and change no hosted resource:
@@ -376,27 +377,24 @@ These features do not fit, for the reasons given:
 
 ## Scale-out plan
 
-Scale-out runs many contests and organizations on one service. The [multi-competition design](https://github.com/GiftedNovaHD/minsky/pull/80) proposes one organization per installation, with competitions as `events` and contests as `sessions`.
+Scale-out runs many contests and organizers on one service. The current design puts every organizer on one shared installation: one Worker, one D1 database, and one R2 bucket, with isolation by `accounts.event_id`, D1 triggers, and the resolver ([event platform design](event-platform-design.md)). Scale work is deferred, so the measured limits below are risks of that design.
 
-### One database for each organization
+### One database or many
 
-Keep one D1 database for each organization, as PR #80 proposes. Do not put all organizations in one database.
-On 2026-10-27 the owner chose one shared installation for all organizers for now and deferred scale, so the measured limits below stay as risks of that choice ([event platform design](event-platform-design.md)).
-
-- One D1 database runs one query at a time. The 2026-10-25 prototype held 119 requests per second, which is a lower bound for one database (measured, hosted). The ceiling is not measured. Measure it with the harness after scale-up item 3, so that the live channel does not stop the run first. One busy contest must not slow another organization's contest.
+- One D1 database runs one query at a time. The 2026-10-25 prototype held 119 requests per second, which is a lower bound for one database (measured, hosted). The ceiling is not measured. Measure it with the harness after scale-up item 3, so that the live channel does not stop the run first. On a shared installation, one busy contest can slow another organizer's contest (inferred).
 - A D1 database holds at most 10 GB, and that limit cannot be raised. Workers Paid allows 50,000 databases for each account, and Cloudflare raises that on request ([D1 limits](https://developers.cloudflare.com/d1/platform/limits/)).
-- Per-competition databases are possible later, because all operational data already belongs to one session. They would split accounts and usernames, which PR #80 keeps per organization. Wait until one organization nears the limits above.
+- A database for each event is possible later, because every query is scoped to one event. Cross-event webmaster reads and the calendar would then read many databases.
 
-A hosted service then needs a small control plane that maps an organization to its database. One Worker script can bind about 5,000 D1 databases (D1 limits). Beyond that, or for stronger isolation, use one Worker for each organization, for example with Workers for Platforms. That choice and its cost belong to the owner.
+A hosted service with many databases needs a small control plane that maps an event to its database. One Worker script can bind about 5,000 D1 databases (D1 limits). Beyond that, or for stronger isolation, use one Worker for each organizer, for example with Workers for Platforms. That choice and its cost are open.
 
-### One Durable Object for each contest session
+### One Durable Object for each contest
 
-Keep the current shape. `idFromName(sessionId)` gives each session its own object, so contests do not share a live channel.
+Keep the current shape. `idFromName(sessionId)` gives each contest its own object, so contests do not share a live channel.
 Each object is still one thread, so scale-up item 3 and the socket checks set the limit for each contest. Many contests add objects, not load on one object.
 
 ### Images
 
-Keep one private R2 bucket for each organization, next to its database, so that deleting an organization deletes one bucket. Inside it, keep the session-scoped keys that exist today. R2 has no egress charge, so storage dominates its cost.
+The current design has one private R2 bucket with session-scoped keys. If events move to their own databases, put one bucket next to each database, so that deleting an event deletes one bucket. R2 has no egress charge, so storage dominates its cost.
 
 ### Cost
 
@@ -414,13 +412,13 @@ Rows read dominated that estimate. At `247e4a7` an ordinary request reads 5 to 6
 Workers traces add a cost from 2026-12-01 if you turn them on ([observability pricing](https://developers.cloudflare.com/observability/pricing/)).
 Nothing in these measurements needs a plan change beyond Workers Paid. The D1 throughput limit is per database, not per plan.
 
-## Decisions for the owner
+## Open decisions
 
-- Whether team accounts must change their temporary password at first sign-in (scale-up item 9 and readiness item S4).
+- Whether team accounts must change their temporary password at first sign-in (scale-up item 9).
 - The D1, R2 and Durable Object locations and the Worker placement for production, chosen together before the production resources exist, so that they are next to each other and near the venue (item 8). Location hints work only at creation.
 - Whether to turn on Workers traces with sampling on a test installation, to measure rows read for each query. Traces cost money from 2026-12-01.
 - Whether the refresh while the live channel is down needs jitter and backoff. The period is 10 seconds, so a screen without a live channel sends 6 times as many refresh reads as at 60 seconds. This can add load when many sockets fail together (inferred). The options are to keep 10 seconds, or to add jitter and backoff.
 - The avatar and members reads. The avatar list can reload only on a session change, on the timer and after the person's own upload, so another person's new picture shows within one timer period. The admin members list can move to a read on the members page only, which needs a frontend change.
 - Whether to bound the retry of retained cleanup rows. The cron lists every image in a removal state that has a deletion row, including images whose files are already removed. It sends up to 100 R2 deletes on each tick, so its reads grow with the rows that the installation keeps in those states (inferred from `R2ImageService.recover` in `src/server/adapters/cloudflare/images.ts`).
 - Whether to add an index on `authentication_limits(window_start)`. The cron's delete of old password-attempt counters is the one scan that `src/server/adapters/d1/cronReads.test.ts` allows. The table holds one row for each failed sign-in key of the last day. An index adds one written row to each failed sign-in (inferred).
-- For a hosted service: one Worker for all organizations or one for each, and whether to use Workers for Platforms.
+- For a hosted service: one Worker for all organizers or one for each, and whether to use Workers for Platforms.

@@ -443,7 +443,7 @@ describe("missingActionHint", () => {
   });
 });
 
-describe("jury award lists (T0009)", () => {
+describe("jury award lists", () => {
   const jury = member({ roles: ["jury"] });
   const resolvedAt = "2026-10-17T10:30:00Z";
   function resolution(issueId: string, at: string): Resolution {

@@ -5,27 +5,27 @@ description: Install a new, isolated Minsky with its own accounts, database, ima
 
 import Diagram from '../../../components/Diagram.astro';
 
-This creates a fresh installation from a reviewed checkout. It imports no data from other installations.
-Cloudflare serves the project's development app. The owner approved that switch separately from PR #43. A future switch needs the owner's approval.
+This guide creates a new installation from a reviewed checkout. It imports no data from other installations.
 
 <Diagram name="cloudflare-architecture" alt="Cloudflare architecture. The browser talks to one Worker on the same origin. The Worker serves the frontend and API, runs a cron every minute, and uses D1 for records and accounts, a private R2 bucket for images, and a Durable Object for live updates." />
 
-<Diagram name="install-steps" alt="Installation steps: 1 create D1, 2 plan and configure, 3 create R2, 4 migrate, 5 build and deploy, 6 bootstrap the owner, 7 create the secret, 8 verify." />
+<Diagram name="install-steps" alt="Installation steps: 1 create D1, 2 plan and configure, 3 create R2, 4 migrate, 5 build and deploy, 6 bootstrap the first webmaster, 7 create the secret, 8 verify." />
 
-:::note[Verified for development]
-Two fresh installations passed on 18 October 2026 at source `f6864f6` ([evidence](https://github.com/GiftedNovaHD/minsky/blob/main/docs/history/run-log.md#t0021-fresh-development-installation-2026-10-18)).
-This does not prove production capacity.
+:::note[Verification limit]
+Two fresh development installations passed on 18 October 2026 at source `f6864f6`, with an earlier version of step 6.
+Step 6 and webmaster recovery changed after that date. Local tests cover the new code, but the current steps have not run on a fresh hosted installation.
+None of this proves production capacity.
 :::
 
 ## Prepare
 
 You need:
 
-- Node.js 22.22+ (22.x) or 24+, npm, and Bash.
-- A Cloudflare account with **Workers Paid** (from US$5/month) and **R2** active. Password hashing exceeds the Free plan's CPU limit. Check [Workers](https://developers.cloudflare.com/workers/platform/pricing/), [D1](https://developers.cloudflare.com/d1/platform/pricing/), [R2](https://developers.cloudflare.com/r2/pricing/), and [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) pricing.
+- Node.js 22.22 or later in the 22.x line, or Node.js 24 or later, with npm and Bash.
+- A Cloudflare account with the Workers Paid plan and R2 active. Password hashing exceeds the CPU limit of the Free plan. Check [Workers](https://developers.cloudflare.com/workers/platform/pricing/), [D1](https://developers.cloudflare.com/d1/platform/pricing/), [R2](https://developers.cloudflare.com/r2/pricing/), and [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) pricing.
 - A password manager for the generated credentials.
 
-From the checkout root, in one shell for all steps:
+Run these commands from the checkout root. Use one shell for all steps.
 
 ```sh
 npm ci
@@ -70,7 +70,7 @@ MINSKY_INSTALL_DATABASE_ID='REPLACE_WITH_NEW_DATABASE_UUID'
 npx wrangler d1 info "$MINSKY_INSTALL_DATABASE" --config=.wrangler/installation/provision.jsonc --json
 ```
 
-Add `--location=apac` (or another [location hint](https://developers.cloudflare.com/d1/configuration/data-location/#provide-a-location-hint)) to choose a region. A hint is not a guarantee.
+To choose a region, add `--location=apac` or another [location hint](https://developers.cloudflare.com/d1/configuration/data-location/#provide-a-location-hint). A hint is not a guarantee.
 
 ## 2. Plan and configure
 
@@ -83,7 +83,7 @@ Fill in `provider.json`. It holds public values only.
 | `databaseName`, `databaseId` | From step 1 |
 | `bucketName` | `$MINSKY_INSTALL_BUCKET` |
 | `origin` | `$MINSKY_INSTALL_ORIGIN`, no trailing slash |
-| `placementRegion` | Optional. A [placement region](https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region) near D1, for example `aws:ap-southeast-1`. Omit it to use Smart Placement. |
+| `placementRegion` | Optional. A [placement region](https://developers.cloudflare.com/workers/configuration/placement/#specify-a-cloud-region) near D1, for example `aws:ap-southeast-1`. Omit it to use Smart Placement. Set this value. In one hosted test in October 2026, Smart Placement ran the Worker in North America against a D1 database in Asia Pacific, with a median request of 1,537 ms and scenario timeouts. An explicit region near the database gave 125 ms. |
 
 ```sh
 npm run cloudflare:install -- plan --settings=.wrangler/installation/provider.json --config="$MINSKY_INSTALL_CONFIG"
@@ -100,7 +100,7 @@ Do not edit the generated file. To change settings, generate a new one at a new 
 npx wrangler r2 bucket create "$MINSKY_INSTALL_BUCKET" --config="$MINSKY_INSTALL_CONFIG" --update-config=false
 ```
 
-Keep the bucket private: no `r2.dev` URL and no public domain. The Worker serves images to authorized users.
+Keep the bucket private. Do not add an `r2.dev` URL or a public domain. The Worker serves images to authorized users.
 
 ## 4. Migrate
 
@@ -110,31 +110,71 @@ npm run cloudflare:install -- migrate --config="$MINSKY_INSTALL_CONFIG" --accoun
 
 ## 5. Build and deploy
 
+Before the real deploy, check in the Cloudflare dashboard that no Worker has your `workerName`. Never replace an existing Worker.
+
 ```sh
 npm run build
 npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG" --dry-run
 npx wrangler deploy --config="$MINSKY_INSTALL_CONFIG"
 ```
 
-Before the real deploy, check in **Workers & Pages** that no Worker has your `workerName`. Never replace an existing Worker.
-
 ## 6. Create the first webmaster
 
 Bootstrap creates exactly one webmaster and nothing else. It makes no event, contest, or team.
-The bootstrap command reaches your hosted D1 database only. It has no local mode, so run it with the Cloudflare credentials of the installation.
-Edit `site.json`: `webmasterName` and `webmasterHandle`.
-A handle is 3–32 lowercase letters, digits, `_`, or `-`, starting with a letter or digit.
+The command reaches your hosted D1 database only. It has no local mode, so run it with the Cloudflare login of the installation.
+
+In `site.json`, set `webmasterName` and `webmasterHandle`.
+A handle has 3 to 32 lowercase letters, digits, `_`, or `-`, and starts with a letter or digit.
 
 ```sh
 MINSKY_INSTALL_PRIVATE_DIR="$(mktemp -d)" && chmod 700 "$MINSKY_INSTALL_PRIVATE_DIR"
 npm run cloudflare:install -- bootstrap --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID" --site=.wrangler/installation/site.json --credentials="$MINSKY_INSTALL_PRIVATE_DIR/webmaster.json"
 ```
 
-`webmaster.json` (mode `0600`) holds the webmaster's account ID, handle, and temporary password. Move it to your password manager. Never commit or share it.
+`webmaster.json` has mode `0600`. It holds the webmaster's account ID, handle, and temporary password. Move it to your password manager. Never commit or share it.
 Bootstrap is atomic and refuses a database that already has data.
-The webmaster types the handle with **Site sign-in**.
 
-Then the webmaster signs in and creates the first event. See [Run the site as a webmaster](/guides/webmaster/). The event admin builds the event with [Run an event](/guides/event-admin/).
+## 7. Enable sign-in
+
+```sh
+npm run cloudflare:install -- secret --config="$MINSKY_INSTALL_CONFIG" --account="$MINSKY_INSTALL_ACCOUNT_ID" --database="$MINSKY_INSTALL_DATABASE_ID"
+```
+
+This command sets a random `AUTH_SECRET` without printing it. It refuses to replace an existing secret.
+
+## 8. Verify
+
+1. Open your origin, select **Sign in**, and select **Site sign-in**.
+2. Enter the handle and the temporary password from `webmaster.json`, and change the password.
+3. Check that the **Site** page opens and shows "No events yet."
+4. Check that a private path returns `404`:
+   ```sh
+   curl -s -o /dev/null -w '%{http_code}\n' "$MINSKY_INSTALL_ORIGIN/.env"
+   ```
+5. Run the [complete journey](/operators/verification/) on a fictional event.
+
+Record the source revision, the Worker version, the resource IDs, and the results.
+
+To start real work, [create an event](/guides/webmaster/#create-an-event).
+
+## If something fails
+
+The installer prints a fixed message and hides provider output. It never deletes resources.
+
+| Problem | Do this |
+| --- | --- |
+| Settings or target rejected | Fix `provider.json` or the login. Configure again at a new path. |
+| R2 error `10042` | Activate R2. Check whether the bucket exists before you retry. |
+| Migration fails | Inspect the applied migrations. Do not reset the database or rerun bootstrap. |
+| Secret fails | Check that the Worker exists. The command never rotates an existing `AUTH_SECRET`. |
+| Bootstrap fails or its output is lost | Keep any result file. Check for a webmaster with the query below. If one exists, [recover the password](#recover-a-webmaster-password). |
+| Output file exists | Keep it. Choose a new path. Minsky never overwrites these files. |
+
+To check whether bootstrap committed, run this query. It shows IDs only.
+
+```sh
+npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="SELECT account_id FROM grants WHERE scope = 'site'"
+```
 
 ## Repair an event deletion
 
@@ -184,31 +224,37 @@ If the **Site** page shows no progress for an event:
 2. Compare `eventId` with the event, and check the D1 and R2 status of your Cloudflare account. A provider failure clears by itself, and the deletion continues from its current step.
 3. If the same line stays after the provider recovers, keep the event's journal and report `phase`, `cause`, `errorName`, and `errorCode` to the maintainers. A foreign key refusal stays until someone changes the row that holds the key, and **Stopped** does not appear for it when D1 hides the reason. Do not change `event_deletions` or `event_deletion_targets`, because each later step reads them.
 
-## Fix installation problems
+## Recover a webmaster password
 
-| Problem | Do this |
-| --- | --- |
-| Settings or target rejected | Fix `provider.json` or the login. Configure again at a new path. |
-| R2 error `10042` | Activate R2. Check whether the bucket exists before you retry. |
-| Migration fails | Inspect the applied migrations. Do not reset the database or rerun bootstrap. |
-| Secret fails | Check that the Worker exists. The command never rotates an existing `AUTH_SECRET`. |
-| Bootstrap fails or its output is lost | Keep any result file. Check for a webmaster (below). If one exists, recover the webmaster. |
-| Output file exists | Keep it. Choose a new path. Files are never overwritten. |
+Use this procedure when a webmaster cannot sign in and no other webmaster can help.
+If another webmaster can sign in, that webmaster can [reset the password on the **Site** page](/guides/webmaster/#manage-webmasters) instead.
+For an event admin, a contest admin, or a contestant, an organizer [issues a new password in the app](/guides/event-admin/#share-passwords-and-print-sheets).
 
-Check whether bootstrap committed. The query shows IDs only:
+You need these items:
 
-```sh
-npx wrangler d1 execute "$MINSKY_INSTALL_DATABASE" --remote --config="$MINSKY_INSTALL_CONFIG" --command="SELECT account_id FROM grants WHERE scope = 'site'"
-```
+- A private, interactive terminal on your own computer. The command refuses CI. It also refuses a terminal whose output is redirected, because the password must stay on that screen.
+- A Wrangler login for the Cloudflare account of the installation.
+- The configuration file from step 2. Another Wrangler file works if it has exactly one `DB` binding with `"remote": true` and no `env` section. Without `--config`, the command reads `wrangler.jsonc` in the checkout, which has no remote database, and refuses.
+- The webmaster's handle.
 
-## Recover the webmaster
+The command changes the database that the file names, and it asks for no confirmation. Check `database_name` in the file before you run it.
 
-If the only webmaster loses access, run this in a maintainer terminal. It finds the webmaster by handle and prints a new temporary password:
+1. From the checkout root, run the command. Separate each flag from its value with a space. The command refuses the `--flag=value` form.
+   ```sh
+   npm run cloudflare:recover-admin -- --config "$MINSKY_INSTALL_CONFIG" --username WEBMASTER_HANDLE
+   ```
+2. Confirm that the first line of the output names your database: `Recovering a webmaster in remote D1 database <name>.`
+3. Copy the temporary password from the terminal. The command prints it once and writes it to no file or log. Do not paste the output into chat or commit it.
+4. Give the password to the webmaster through a secure channel.
+5. The webmaster signs in with **Site sign-in** and must change the password.
 
-```sh
-npm run cloudflare:recover-admin -- --config="$MINSKY_INSTALL_CONFIG" --username=WEBMASTER_HANDLE
-```
+The command makes these changes in one database batch:
 
-Another webmaster can instead reset the password on the **Site** page.
-Recovery keeps the owner's ID, history, and memberships, signs out old sessions, and issues a new temporary password.
-It does not re-enable a disabled owner or restore removed admin rights, and the first session must still be active. If it stops midway, run it again with a new output file.
+- It sets a new temporary password and requires a password change at the next sign-in.
+- It ends every login and session of the account.
+- It records the recovery in `authority_audit` and in `account_operations`.
+
+The account keeps its ID and history.
+
+The command refuses an unknown handle, a disabled account, and an account that is not a webmaster. It does not re-enable a disabled account or restore a removed webmaster.
+If the batch fails, the old password stays valid. Run the command again.

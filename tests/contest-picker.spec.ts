@@ -466,6 +466,85 @@ test.describe("a contestant with several contests", () => {
   });
 });
 
+// A sign-out must not leave the contest of the person who chose it in any address
+// that the tab shows before the next sign-in. The phone screens above the home each
+// hold a history entry, and the unmount of those screens goes back one entry after
+// the sign-out. Browser Back reaches the entries below the same way.
+test.describe("a tab that signed out", () => {
+  const signOut = async (page: Page) => {
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+  };
+
+  const signInHere = async (page: Page, username = "contestant") => {
+    await page.getByLabel("Username", { exact: true }).fill(username);
+    await page.getByLabel("Password", { exact: true }).fill(randomUUID());
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  };
+
+  const withoutContest = (page: Page) => expect(page).toHaveURL((url) => !url.searchParams.has("contest"));
+
+  const nextPersonGetsTheDefault = async (page: Page, running: string) => {
+    await signInHere(page);
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await at(page, "/issues", running);
+  };
+
+  test("shows no contest after Back, and the next sign-in opens the default", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "My account" }).click();
+    await at(page, "/account", ids.ended);
+    await signOut(page);
+    await page.goBack();
+    await settle(page);
+    await expect(page).toHaveURL((url) => url.pathname === "/issues");
+    await withoutContest(page);
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
+  test.describe("on a phone", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    // Staff hold Delta open, so the person can report in it, and the default stays Charlie.
+    async function openReportForm(page: Page, local: LocalWorker) {
+      const ids = await three(local);
+      await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.ended);
+      await signIn(page);
+      await choose(page, "Delta");
+      await at(page, "/issues", ids.ended);
+      await page.getByRole("button", { name: "Report an issue" }).click();
+      await expect(page.getByLabel("What is happening?")).toBeVisible();
+      return ids;
+    }
+
+    test("shows no contest after a sign-out from the report form, and the next sign-in opens the default", async ({ page, local }) => {
+      const ids = await openReportForm(page, local);
+      await signOut(page);
+      await settle(page);
+      await withoutContest(page);
+      await nextPersonGetsTheDefault(page, ids.running);
+    });
+
+    test("shows no contest after a sign-out that follows a sent report, and the next sign-in opens the default", async ({ page, local }) => {
+      const ids = await openReportForm(page, local);
+      await page.getByText("Devices", { exact: true }).click();
+      await page.getByLabel("What is happening?").fill("The keyboard stopped working.");
+      await page.getByRole("button", { name: "Send report" }).click();
+      await expect(page.getByLabel("What is happening?")).toHaveCount(0);
+      await expect(page.getByText("The keyboard stopped working.").first()).toBeVisible();
+      await signOut(page);
+      await settle(page);
+      await withoutContest(page);
+      await nextPersonGetsTheDefault(page, ids.running);
+    });
+  });
+});
+
 test.describe("the password form on the account page while the contests change", () => {
   async function typeInNewPassword(page: Page) {
     await page.getByRole("button", { name: /^Account menu for/ }).click();

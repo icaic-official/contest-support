@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { D1Binding } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
+import { CLAIM_DELETION_SQL } from './eventDeletion';
 import { bootstrapSite } from './installation';
 import { openLocalPlatform } from './tooling/store-database.mjs';
 
@@ -24,7 +25,7 @@ describe('full Worker installation boundary with real local D1', () => {
     env = {
       DB: db, AUTH_ORIGIN: origin, AUTH_SECRET: randomUUID() + randomUUID(),
       ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
-      IMAGES: { get: async () => null, put: async () => null, delete: async () => {} },
+      IMAGES: { get: async () => null, put: async () => null, delete: async () => {}, list: async () => ({ objects: [], truncated: false }) },
       LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response(null, { status: 204 }) }) },
     };
   }, timeout);
@@ -58,5 +59,22 @@ describe('full Worker installation boundary with real local D1', () => {
     // A successful sign-in does not count toward the username or IP limit.
     expect((await db.prepare('SELECT count(*) AS count FROM authentication_limits').first<{ count: number }>())?.count).toBe(0);
     expect((await db.prepare('SELECT count(*) AS count FROM ba_session').first<{ count: number }>())?.count).toBe(1);
+  }, timeout);
+
+  it('advances deletions after a management request, and not after another request', async () => {
+    const seen: string[] = [];
+    const recording: D1Binding = { ...db, prepare: (sql) => { seen.push(sql); return db.prepare(sql); }, batch: (statements) => db.batch(statements), exec: (query) => db.exec(query) };
+    const send = async (path: string) => {
+      const pending: Promise<unknown>[] = [];
+      await applicationWorker.fetch(new Request(`${origin}${path}`, {
+        method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-Minsky-Request': '1', 'Sec-Fetch-Site': 'same-origin' },
+        body: '{}',
+      }), { ...env, DB: recording }, { waitUntil: (operation) => { pending.push(operation); } });
+      await Promise.all(pending);
+    };
+    await send('/api/contest-awards');
+    expect(seen).not.toContain(CLAIM_DELETION_SQL);
+    await send('/api/manage');
+    expect(seen).toContain(CLAIM_DELETION_SQL);
   }, timeout);
 });

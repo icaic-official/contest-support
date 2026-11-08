@@ -21,7 +21,6 @@ describe('live password rule', () => {
   let dispose: () => Promise<void>;
   let fixture: D1Fixture;
   let created = false;
-  const lateEntrants: string[] = [];
   let manage: D1ManageService;
   let organizer: Caller;
 
@@ -49,12 +48,6 @@ describe('live password rule', () => {
   });
   afterEach(async () => {
     if (!created) return;
-    await run('DELETE FROM sessions WHERE event_id = ? AND id NOT IN (?, ?)', fixture.eventId, fixture.sessionId, fixture.secondSessionId);
-    for (const entrant of lateEntrants.splice(0)) {
-      await run('DELETE FROM teams WHERE entrant_id = ?', entrant);
-      await run('DELETE FROM accounts WHERE entrant_id = ?', entrant);
-      await run('DELETE FROM entrants WHERE id = ?', entrant);
-    }
     await fixture.cleanup();
   });
 
@@ -225,27 +218,6 @@ describe('live password rule', () => {
     }
   });
 
-  it('removes a live contest and an account with seats and scopes without a count error', async () => {
-    await closeFixtureContests();
-    const live = await liveContest(-10, 60);
-    const gone = await liveContest(-10, 60);
-    await issue(live, both());
-    const account = randomUUID();
-    await run(`INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, 'Fictional', ?, ?, ?, 0)`,
-      account, `u-${account.slice(0, 12)}`, `u-${account.slice(0, 12)}`, fixture.eventId);
-    const team = (await one<{ id: string }>('SELECT id FROM teams WHERE session_id = ? LIMIT 1', live))!.id;
-    await run('INSERT INTO memberships (session_id, account_id, team_id) VALUES (?, ?, ?)', live, account, team);
-    await run(`INSERT INTO credential_scopes (account_id, session_id, operation_id, issued_from, issued_until)
-      VALUES (?, ?, ?, ${at(-10)}, ${at(60)})`, account, live, randomUUID());
-    expect(await unready(live)).toBe(0);
-
-    await run('DELETE FROM accounts WHERE id = ?', account);
-    expect(await unready(live)).toBe(0);
-    await run('DELETE FROM sessions WHERE id = ?', gone);
-    expect(await one('SELECT 1 FROM credential_scopes WHERE session_id = ?', gone)).toBeNull();
-    expect(await unready(live)).toBe(await recount(live));
-  });
-
   it('refuses to move a seat to another account, so the count cannot drift', async () => {
     const live = await liveContest(10, 60);
     await expect(run('UPDATE memberships SET account_id = ? WHERE session_id = ? AND account_id = ?',
@@ -318,7 +290,6 @@ describe('live password rule', () => {
   describe('a late seat in a running live contest', () => {
     async function bareEntrant() {
       const entrant = randomUUID();
-      lateEntrants.push(entrant);
       await run(`INSERT INTO entrants (id, event_id, kind, name) VALUES (?, ?, 'team', ?)`, entrant, fixture.eventId, `Late ${entrant.slice(0, 8)}`);
       return entrant;
     }
@@ -437,7 +408,7 @@ describe('0022 applied one statement at a time', () => {
       await run('INSERT INTO sessions (id, event_id, name) VALUES (?, ?, ?)', contest, eventId, 'Fictional contest');
       const addAccount = async () => {
         const id = randomUUID();
-        await run('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 0)', id, 'Fictional person', `u-${id.slice(0, 12)}`);
+        await run('INSERT INTO accounts (id, name, username, event_id, must_change) VALUES (?, ?, ?, ?, 0)', id, 'Fictional person', `u-${id.slice(0, 12)}`, eventId);
         return id;
       };
       const seatNew = async () => {

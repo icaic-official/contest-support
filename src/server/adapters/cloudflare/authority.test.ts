@@ -65,6 +65,7 @@ describe('one authority resolver for every reader', () => {
     get: async () => ({ size: 1, body: new Response('x').body!, arrayBuffer: async () => new ArrayBuffer(1) }),
     put: async () => null,
     delete: async () => {},
+    list: async () => ({ objects: [], truncated: false }),
   };
   const run = (sql: string, ...values: D1Value[]) => db.prepare(sql).bind(...values).run();
 

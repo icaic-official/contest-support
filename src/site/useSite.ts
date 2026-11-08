@@ -10,6 +10,8 @@ import { errorMessage } from "@/backend/errors";
 import { keepFocus, useRefreshOnReturn } from "@/connected/hooks/useRefreshOnReturn";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
 
+const DELETION_REFRESH_MS = 15_000;
+
 /** The site read and its commands, for webmasters. */
 export interface SiteState {
   /** Undefined while loading and for a person who is not a webmaster. A later failed read keeps the last overview. */
@@ -60,6 +62,15 @@ export function useSite(): SiteState {
     void reload();
   }, [reload]);
   useRefreshOnReturn(reload, running);
+  // A deletion has no socket, and the server advances it in the background.
+  const deleting = site?.deletions.some((deletion) => deletion.finishedAt === null) ?? false;
+  useEffect(() => {
+    if (!deleting) return undefined;
+    const interval = window.setInterval(() => {
+      if (!running.current) void reload();
+    }, DELETION_REFRESH_MS);
+    return () => window.clearInterval(interval);
+  }, [deleting, reload]);
   const run = useCallback(
     async <T>(
       key: string,

@@ -18,6 +18,13 @@ const siteVersionSql = 'COALESCE((SELECT version FROM site_settings WHERE single
 const readsRestrictedSql = 'COALESCE((SELECT restrict_webmaster_reads FROM site_settings WHERE singleton = 1), 0) = 1';
 
 /**
+ * True until a deletion of the event starts. Every reader that reaches an event
+ * or a contest checks it, so the fence stops reads, writes, and sign-ins at once.
+ * A probe that misses reads no row.
+ */
+export const notBeingDeletedSql = (eventId: string) => `NOT EXISTS (SELECT 1 FROM event_deletions d WHERE d.event_id = ${eventId})`;
+
+/**
  * How a statement selects the callers and contests.
  * `caller` binds accountId, loginId, contestId (`contestDataBindings`).
  * `logins` binds contestId, then a JSON array of login IDs. One JSON value stays
@@ -85,7 +92,8 @@ function contestAuthoritySql(selection: ContestSelection): string {
     LEFT JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
     WHERE ${selections[selection]} AND ${liveLoginSql}
       AND (a.event_id = s.event_id OR a.event_id IS NULL)
-      AND (m.account_id IS NOT NULL OR ge.account_id IS NOT NULL OR gs.account_id IS NOT NULL)`;
+      AND (m.account_id IS NOT NULL OR ge.account_id IS NOT NULL OR gs.account_id IS NOT NULL)
+      AND ${notBeingDeletedSql('s.event_id')}`;
 }
 
 /** One row of the contest resolver. Embedders of `contestDataSql` read these names. */
@@ -125,7 +133,7 @@ export function contestDataSql(selection: ContestSelection): string {
  * calendar lists a contest without opening it, so it needs no seat and reads
  * schedules only. `s` names the contest row.
  */
-export const calendarEventSql = 's.event_id = (SELECT event_id FROM accounts WHERE id = login.id)';
+export const calendarEventSql = `s.event_id = (SELECT a.event_id FROM accounts a WHERE a.id = login.id AND ${notBeingDeletedSql('a.event_id')})`;
 export const calendarWebmasterSql = "SELECT 1 FROM login JOIN grants g ON g.scope = 'site' AND g.account_id = login.id";
 
 /** Callers must come from the trusted authentication service. */
@@ -197,7 +205,7 @@ const eventAuthoritySql = `SELECT a.id AS account_id, e.id AS event_id, e.archiv
   LEFT JOIN grants ge ON ge.scope = 'event' AND ge.event_id = e.id AND ge.account_id = a.id
   LEFT JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
   WHERE a.id = ? AND l.id = ? AND e.id = ? AND ${liveLoginSql}
-    AND (a.event_id = e.id OR gs.account_id IS NOT NULL)`;
+    AND (a.event_id = e.id OR gs.account_id IS NOT NULL) AND ${notBeingDeletedSql('e.id')}`;
 
 /** The only constructor of a seat on the server. A row without data access has no seat. */
 export function seatFromRow(row: Pick<ContestAuthorityRow, 'data' | 'team_id' | 'staff' | 'is_admin' | 'roles' | 'entrant_kind'>): Seat | null {
@@ -321,7 +329,7 @@ export const loginAccountColumns = `a.id AS account_id, a.username AS login_key,
 export const signInAccountSql: { readonly [K in SignInTarget['kind']]: string } = {
   event: `SELECT e.id AS event_id, ${loginAccountColumns}
     FROM events e LEFT JOIN accounts a ON a.event_id = e.id AND a.handle = ?
-    WHERE e.code = ?`,
+    WHERE e.code = ? AND ${notBeingDeletedSql('e.id')}`,
   site: `SELECT NULL AS event_id, ${loginAccountColumns}
     FROM accounts a JOIN grants gs ON gs.scope = 'site' AND gs.account_id = a.id
     WHERE a.event_id IS NULL AND a.handle = ?`,

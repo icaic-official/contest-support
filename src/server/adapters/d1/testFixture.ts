@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { unstable_splitSqlQuery as splitSqlQuery } from "wrangler";
 import type { Caller } from '../../authentication';
+import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import type { D1Connection, D1Statement } from "./connection";
 import type { D1Value } from './connection.ts';
 
@@ -99,8 +100,8 @@ export class D1Fixture {
       this.statement("INSERT INTO teams (id, session_id) VALUES (?, ?), (?, ?), (?, ?)",
         this.teamId, this.sessionId, this.otherTeamId, this.sessionId,
         this.secondSessionTeamId, this.secondSessionId),
-      this.statement(`INSERT INTO accounts (id, name, must_change) VALUES ${repeat(accounts.length, "(?, ?, 0)")}`,
-        ...accounts.flatMap((caller, index) => [caller.accountId, `d1-proof:${this.eventId}:${index}`])),
+      this.statement(`INSERT INTO accounts (id, name, event_id, must_change) VALUES ${repeat(accounts.length, "(?, ?, ?, 0)")}`,
+        ...accounts.flatMap((caller, index) => [caller.accountId, `d1-proof:${this.eventId}:${index}`, this.eventId])),
       this.statement(`INSERT INTO logins (id, account_id, expires_at) VALUES ${repeat(accounts.length, "(?, ?, unixepoch() + 3600)")}`,
         ...accounts.flatMap((caller) => [caller.loginId, caller.accountId])),
       this.statement(`INSERT INTO memberships (session_id, account_id, team_id) VALUES ${repeat(accounts.length + 1, "(?, ?, ?)")}`,
@@ -198,17 +199,12 @@ export class D1Fixture {
     if (JSON.stringify(owned) !== JSON.stringify(expected)) {
       throw new Error(`Fixture ownership mismatch for ${this.eventId}. Cleanup stopped.`);
     }
-    const expectedSessions = [this.sessionId, this.secondSessionId].sort().map((id) => ({ id }));
-    if (JSON.stringify(sessions) !== JSON.stringify(expectedSessions)) {
+    // A test can add contests to its own event. The event's UUID owns them too.
+    const contests = (sessions ?? []).map((row) => row.id);
+    if (![this.sessionId, this.secondSessionId].every((id) => contests.includes(id))) {
       throw new Error(`Fixture session ownership mismatch for ${this.eventId}. Cleanup stopped.`);
     }
-    // Remove owned history before deleting its authenticated actors.
-    const accountIds = accounts.map((caller) => caller.accountId);
-    await this.db.batch([
-      this.statement("DELETE FROM events WHERE id = ?", this.eventId),
-      ...(this.workflow ? [this.statement("DELETE FROM ba_user WHERE id IN (?, ?, ?, ?)", ...accountIds)] : []),
-      this.statement("DELETE FROM accounts WHERE id IN (?, ?, ?, ?)", ...accountIds),
-    ]);
+    await removeFixtureEvent(this.db, this.eventId);
     const workflowQueries = this.durableQueries();
     const checks = await this.rowsBatch([
       ...workflowQueries.map(([, sql]) => this.statement(sql, this.sessionId, this.secondSessionId)),

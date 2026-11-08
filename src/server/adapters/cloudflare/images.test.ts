@@ -19,7 +19,6 @@ const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 
 interface TestBucket extends Omit<PrivateBucket, 'put'> {
   put(key: string, body: Uint8Array | ReadableStream<Uint8Array>, options?: Parameters<PrivateBucket['put']>[2]): Promise<unknown | null>;
-  list(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }>;
 }
 
 describe('Cloudflare private images with local D1 and R2 bindings', () => {
@@ -136,7 +135,7 @@ describe('Cloudflare private images with local D1 and R2 bindings', () => {
     return {
       get: (key, options) => bucket.get(key, options),
       put: (key, body, options) => bucket.put(key, body, options),
-      delete: (keys) => bucket.delete(keys), ...overrides,
+      delete: (keys) => bucket.delete(keys), list: (options) => bucket.list(options), ...overrides,
     };
   }
 

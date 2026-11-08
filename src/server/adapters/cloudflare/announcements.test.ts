@@ -8,6 +8,7 @@ import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
+import { fenceFixtureEvent } from './eventDeletionFixture';
 import type { PrivateBucket } from './images';
 import { openLocalPlatform } from './tooling/store-database.mjs';
 
@@ -17,7 +18,6 @@ const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 
 interface TestBucket extends Omit<PrivateBucket, 'put'> {
   put(key: string, body: Uint8Array | ReadableStream<Uint8Array>, options?: Parameters<PrivateBucket['put']>[2]): Promise<unknown | null>;
-  list(options: { prefix: string }): Promise<{ objects: Array<{ key: string }> }>;
 }
 
 describe('Cloudflare session announcements with local D1 and R2 bindings', () => {
@@ -112,7 +112,9 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
   }
 
   // A binding-provided body retains its known length through the R2 proxy.
-  async function transfer(path: string, options: { bytes?: Uint8Array; digest?: string; length?: number; caller?: Caller } = {}) {
+  async function transfer(path: string, options: {
+    bytes?: Uint8Array; digest?: string; length?: number; caller?: Caller; instance?: R2AnnouncementImageService;
+  } = {}) {
     const bytes = options.bytes ?? png;
     const sourceKey = `source:${fixture.eventId}:${randomUUID()}`;
     ownedKeys.add(sourceKey);
@@ -120,7 +122,8 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     const source = await bucket.get(sourceKey);
     if (!source) throw new Error('The test source object is missing.');
     try {
-      await images.upload(options.caller ?? admin, path, source.body, 'image/png', options.digest ?? sha256(bytes), options.length ?? bytes.byteLength);
+      await (options.instance ?? images).upload(options.caller ?? admin, path, source.body, 'image/png',
+        options.digest ?? sha256(bytes), options.length ?? bytes.byteLength);
     } finally {
       if (!source.body.locked) await source.body.cancel();
     }
@@ -328,6 +331,22 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     await images.finish(admin, fixture.sessionId, image.id);
     await expect(transfer(image.path, { digest: 'e'.repeat(64) })).rejects.toBeDefined();
     expect(await bytesOf(image.path, admin)).toEqual(png);
+  });
+
+  it('removes its own file when the event is fenced and the rows step removes the image during the transfer', async () => {
+    const id = await publish();
+    const image = await reserve(id);
+    const late = new R2AnnouncementImageService(db, {
+      get: (key, options) => bucket.get(key, options), delete: (keys) => bucket.delete(keys), list: (options) => bucket.list(options),
+      put: async (key, body, options) => {
+        // The file pass of the deletion can also be over by now, so no later step removes this file.
+        await fenceFixtureEvent(db, fixture.eventId);
+        await statement('DELETE FROM announcement_images WHERE id = ?', image.id).run();
+        return bucket.put(key, body, options);
+      },
+    });
+    await expect(transfer(image.path, { instance: late })).rejects.toMatchObject({ validation: true });
+    expect((await bucket.list({ prefix: `${fixture.sessionId}/` })).objects).toEqual([]);
   });
 
   it('removes a ready image for any manager, keeps its record, and deletes its file', async () => {

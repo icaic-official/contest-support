@@ -96,8 +96,6 @@ describe('Cloudflare authorized application and administration', () => {
 
   afterEach(async () => {
     if (!created) return;
-    await db.batch([fixture.staff, fixture.specialist, fixture.contestant, fixture.otherContestant]
-      .map((caller) => statement('DELETE FROM ba_user WHERE id = ?', caller.accountId)));
     await fixture.cleanup();
   });
 

@@ -17,7 +17,7 @@ function failingEnvironment(): ApplicationEnvironment {
     DB: { prepare: fail, batch: fail, exec: fail },
     AUTH_ORIGIN: origin, AUTH_SECRET: secret,
     ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
-    IMAGES: { get: async () => null, put: async () => null, delete: async () => {} },
+    IMAGES: { get: async () => null, put: async () => null, delete: async () => {}, list: async () => ({ objects: [], truncated: false }) },
     LIVE_UPDATES: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response(null, { status: 204 }) }) },
   };
 }

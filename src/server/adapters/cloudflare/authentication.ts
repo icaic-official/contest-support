@@ -6,7 +6,7 @@ import {
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
 import type { IdentityProvider } from './identity';
 import {
-  loginAccountColumns, ownHandleSql, signInAccountSql,
+  loginAccountColumns, notBeingDeletedSql, ownHandleSql, signInAccountSql,
 } from './authority';
 import { beginCredentialReset, completeCredentialReset, loginKeyFor } from './credentials';
 import { randomSecret, type PasswordHasher } from './password';
@@ -172,10 +172,13 @@ export class D1AuthenticationService implements AuthenticationService {
     const assertionId = crypto.randomUUID();
     // A reset can race Better Auth password verification. Only the generation
     // captured BEFORE verification can approve the resulting identity session.
+    // The fence of a deletion can also commit during verification. It revokes
+    // only the logins that exist, so this batch checks it again.
     await this.guarded([
       this.assertion(assertionId, `SELECT 1 FROM accounts a JOIN ba_session b ON b.userId = a.id
         WHERE a.id = ? AND a.id = ? AND a.credential_generation = ?
-          AND a.disabled = 0 AND a.credential_state = 'ready' AND b.id = ? AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+          AND a.disabled = 0 AND a.credential_state = 'ready' AND b.id = ? AND b.expiresAt > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+          AND ${notBeingDeletedSql('a.event_id')}`,
       signed.accountId, before.account_id, before.credential_generation, signed.identitySessionId),
       this.statement(`INSERT INTO logins (id, account_id, expires_at, identity_session_id, credential_generation, csrf)
         SELECT ?, a.id, unixepoch(b.expiresAt), b.id, a.credential_generation, ?

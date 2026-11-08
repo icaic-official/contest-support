@@ -72,17 +72,20 @@ export function ConnectedApp() {
   const routerState: unknown = location.state;
   const auth = useAuthSession();
   const { user } = auth;
-  // The address holds the contest that the signed-in person chose. After a
-  // sign-out, the next person who signs in on this tab starts from the default
-  // contest. A visit that was never signed in keeps the contest of a shared link.
-  const wasSignedIn = useRef(false);
+  // The address holds the contest that the signed-in person chose. From the
+  // sign-out to the next sign-in, no address that this tab shows keeps it, so
+  // the next person starts from the default contest. That covers the entries
+  // that the browser returns to after the sign-out: a phone screen above the
+  // home goes back one entry when it unmounts, and Back reaches the rest. A
+  // visit that was never signed in keeps the contest of a shared link.
+  const tab = useRef<"new" | "signed-in" | "signed-out">("new");
   useEffect(() => {
     if (user) {
-      wasSignedIn.current = true;
+      tab.current = "signed-in";
       return;
     }
-    if (!wasSignedIn.current) return;
-    wasSignedIn.current = false;
+    if (tab.current === "signed-in") tab.current = "signed-out";
+    if (tab.current !== "signed-out") return;
     const cleared = searchWithoutContest(search);
     if (cleared === search) return;
     void navigate({ pathname, search: cleared, hash }, { replace: true, state: routerState });

@@ -165,6 +165,7 @@ Minsky records awards and confirmations. It does not change the clock of the ext
 
 - Only staff with the **Jury** role record an award, for an issue or for the whole contest. An event admin without that role cannot.
 - Staff with the **Volunteer**, **Specialist**, or **Jury** role select **Confirm applied externally** after they apply the minutes in the external contest system.
+- Staff with the **Jury** role can withdraw an award that nobody has confirmed. A withdrawn award adds no minutes, and its issue cannot take another award. For the steps, see [Withdraw a wrong issue award](/guides/jury/#withdraw-a-wrong-issue-award).
 - A contestant's end time grows only by confirmed minutes. The contestant can report until that end time plus the grace period.
 
 To record or confirm awards yourself, assign yourself the role on the **Assignments** tab. A webmaster belongs to no event, so a webmaster cannot take a role this way. For the steps, see [Record time awards](/guides/jury/).

@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
@@ -21,8 +21,7 @@ import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
-import { searchWithoutContest } from "./navigation";
-import { setTabSignedOut, tabSignedOut } from "./tabSignOut";
+import { contestOwnerOf, withContestOwner } from "./navigation";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
 
@@ -69,37 +68,10 @@ const mainClasses: Record<Layout, string> = {
 export function ConnectedApp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { pathname, search, hash } = location;
+  const { pathname, search } = location;
   const routerState: unknown = location.state;
   const auth = useAuthSession();
   const { user } = auth;
-  // The address holds the contest that the signed-in person chose. From the
-  // sign-out to the next sign-in, no address that this tab shows keeps it, so
-  // the next person starts from the default contest. That covers the entries
-  // that the browser returns to after the sign-out: a phone screen above the
-  // home goes back one entry when it unmounts, and Back reaches the rest. Only
-  // a sign-in ends the state. A reload or a new page load does not, because
-  // Back loads the older entries as page loads too. A tab that never signed in
-  // keeps the contest of a shared link.
-  const wasSignedIn = useRef(false);
-  useEffect(() => {
-    if (auth.loading) return;
-    if (user) {
-      if (!wasSignedIn.current) {
-        wasSignedIn.current = true;
-        setTabSignedOut(false);
-      }
-      return;
-    }
-    if (wasSignedIn.current) {
-      wasSignedIn.current = false;
-      setTabSignedOut(true);
-    }
-    if (!tabSignedOut()) return;
-    const cleared = searchWithoutContest(search);
-    if (cleared === search) return;
-    void navigate({ pathname, search: cleared, hash }, { replace: true, state: routerState });
-  }, [auth.loading, user, navigate, pathname, search, hash, routerState]);
   const [live, setLive] = useState(false);
   const account = useAccountStatus(user?.id, live);
   const [passwordSetup, setPasswordSetup] = useState(false);
@@ -179,7 +151,8 @@ export function ConnectedApp() {
         refreshAccount={account.refresh}
         changePassword={() => {
           // This unmounts the workspace. Its hook reads the contest from the address when it mounts again.
-          navigate({ pathname: "/account", search });
+          // The new entry keeps the owner of the contest, because no hook is there to write it.
+          navigate({ pathname: "/account", search }, { state: withContestOwner(undefined, contestOwnerOf(routerState)) });
           setPasswordSetup(true);
         }}
         signOut={auth.signOut}

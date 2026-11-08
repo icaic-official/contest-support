@@ -53,12 +53,24 @@ export function searchWithContest(search: string, contestId: string): string {
   return `?${params}`;
 }
 
-/** The search text without `?contest=`. Every other parameter stays. */
-export function searchWithoutContest(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete(contestParam);
-  const rest = params.toString();
-  return rest === "" ? "" : `?${rest}`;
+const ownerField = "contestOwner";
+
+/**
+ * The account whose choice the `?contest=` of a history entry holds. It lives
+ * in the router state, which the browser keeps with the entry across a reload
+ * and Back. An address from outside the app, such as a shared link, has no
+ * owner.
+ */
+export function contestOwnerOf(state: unknown): string | undefined {
+  if (typeof state !== "object" || state === null) return undefined;
+  const owner: unknown = (state as Record<string, unknown>)[ownerField];
+  return typeof owner === "string" ? owner : undefined;
+}
+
+/** The router state with this owner. Every other field, such as a focus request, stays. An undefined owner leaves the state as it is. */
+export function withContestOwner(state: unknown, owner: string | undefined): unknown {
+  if (owner === undefined) return state;
+  return { ...(typeof state === "object" && state !== null ? state : {}), [ownerField]: owner };
 }
 
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */

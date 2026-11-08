@@ -12,7 +12,7 @@ import { errorMessage } from "@/backend/errors";
 import { defaultContest, orderContests } from "../contestList";
 import { keepUnchanged } from "../keepUnchanged";
 import type { Snapshot } from "../model";
-import { contestOfSearch, searchWithContest } from "../navigation";
+import { contestOfSearch, contestOwnerOf, searchWithContest, withContestOwner } from "../navigation";
 import { createRefreshQueue } from "./refreshQueue";
 import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
@@ -68,7 +68,11 @@ function inBackground(): boolean {
  * read opens the contest that `?contest=` names, else the one that runs now,
  * else the next one. `sessionId` is the only record of the choice. For a
  * person with several contests the address holds a copy, so a reload keeps
- * the choice. The hook reads the address once, when it starts.
+ * the choice. The hook reads the address once, when it starts. The copy names
+ * its account in the router state of the history entry. The hook ignores the
+ * copy of another account, so the next person on a tab starts from the
+ * default. An address with no owner came from outside the app, such as a
+ * shared link, and the hook honors it.
  *
  * It refreshes on live changes, on focus, when the tab becomes visible and
  * when the browser comes back online. A timer refreshes every 60 seconds, with
@@ -85,9 +89,11 @@ export function useSessionSnapshot(userId: string): SessionData {
   const [updates, setUpdates] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
-  // The contest that the address named when the page loaded. A read honors it
-  // until one read succeeds. A later access loss then falls back to the default.
-  const addressed = useRef(contestOfSearch(location.search));
+  // The contest that the address named when the hook started, unless another
+  // account chose it. A read honors it until one read succeeds. A later access
+  // loss then falls back to the default.
+  const owner = contestOwnerOf(location.state);
+  const addressed = useRef(owner === undefined || owner === userId ? contestOfSearch(location.search) : undefined);
   const clockOffset = useRef(0);
   // Server time of the newest snapshot shown. An older snapshot never replaces it.
   const shownAt = useRef(0);
@@ -239,11 +245,13 @@ export function useSessionSnapshot(userId: string): SessionData {
   }, [changesAt]);
   // The address follows the choice and never decides it. A replace adds no
   // history entry. The hash, the router state and the other parameters stay,
-  // because the account page reads the hash and the state to place focus.
+  // because the account page reads the hash and the state to place focus. The
+  // state also gets the owner. A link drops the state, so a new entry gets the
+  // owner here too.
   const several = sessions.length > 1;
   useEffect(() => {
     if (!sessionId || !several) return;
-    if (contestOfSearch(location.search) === sessionId) return;
+    if (contestOfSearch(location.search) === sessionId && contestOwnerOf(location.state) === userId) return;
     // `BrowserRouter` renders a navigation in a transition, after `history` has
     // written it. A replace from this older location would overwrite that entry.
     // So this waits, and the `location` dependency runs it again on commit. The
@@ -251,16 +259,15 @@ export function useSessionSnapshot(userId: string): SessionData {
     if (location.pathname !== window.location.pathname || location.search !== window.location.search) {
       return;
     }
-    const state: unknown = location.state;
     void navigate(
       {
         pathname: location.pathname,
         search: searchWithContest(location.search, sessionId),
         hash: location.hash,
       },
-      { replace: true, state },
+      { replace: true, state: withContestOwner(location.state, userId) },
     );
-  }, [location, navigate, sessionId, several]);
+  }, [location, navigate, sessionId, several, userId]);
   const selectSession = useCallback((next: string) => {
     generation.current++;
     readFor.current = undefined;

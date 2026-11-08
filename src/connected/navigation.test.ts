@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ManageLevel } from "@/backend/contracts";
-import { contestOfSearch, levelScreenAccess, searchWithContest, searchWithoutContest } from "./navigation";
+import { contestOfSearch, contestOwnerOf, levelScreenAccess, requestedFocus, searchWithContest, withContestOwner } from "./navigation";
 
 describe("contestOfSearch", () => {
   it("reads the contest parameter", () => {
@@ -23,23 +23,32 @@ describe("contestOfSearch", () => {
   });
 });
 
-describe("searchWithoutContest", () => {
-  it("drops the parameter and keeps every other one", () => {
-    expect(searchWithoutContest("?a=1&contest=old&b=2")).toBe("?a=1&b=2");
+describe("contestOwnerOf", () => {
+  it("reads the owner that withContestOwner writes", () => {
+    expect(contestOwnerOf(withContestOwner(undefined, "a1"))).toBe("a1");
+    expect(contestOwnerOf(withContestOwner({ contestOwner: "a1" }, "b2"))).toBe("b2");
   });
 
-  it("returns an empty search when the parameter was the only one", () => {
-    expect(searchWithoutContest("?contest=old")).toBe("");
-    expect(searchWithoutContest("?contest=")).toBe("");
+  it("finds no owner in a state that the app did not write", () => {
+    expect(contestOwnerOf(undefined)).toBeUndefined();
+    expect(contestOwnerOf(null)).toBeUndefined();
+    expect(contestOwnerOf("a1")).toBeUndefined();
+    expect(contestOwnerOf({ focusId: "x", token: "t" })).toBeUndefined();
+    expect(contestOwnerOf({ contestOwner: 7 })).toBeUndefined();
+  });
+});
+
+describe("withContestOwner", () => {
+  it("keeps the focus request and every other field", () => {
+    const state = withContestOwner({ focusId: "current-password", token: "t1", screen: true }, "a1");
+    expect(requestedFocus(state)).toEqual({ focusId: "current-password", token: "t1" });
+    expect(state).toMatchObject({ screen: true });
   });
 
-  it("leaves a search without the parameter as it is", () => {
-    expect(searchWithoutContest("")).toBe("");
-    expect(searchWithoutContest("?a=1")).toBe("?a=1");
-  });
-
-  it("drops every copy of the parameter", () => {
-    expect(searchWithoutContest("?contest=a&x=1&contest=b")).toBe("?x=1");
+  it("leaves the state as it is without an owner", () => {
+    const state = { focusId: "x", token: "t" };
+    expect(withContestOwner(state, undefined)).toBe(state);
+    expect(withContestOwner(undefined, undefined)).toBeUndefined();
   });
 });
 

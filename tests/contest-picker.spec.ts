@@ -385,35 +385,6 @@ test.describe("a contestant with several contests", () => {
     });
   }
 
-  // The address holds the choice of the person who signed in. The next person on the tab starts
-  // from the default. A signed-out visit to a shared link still keeps its contest (test below).
-  test("clears the contest from the address on sign-out, so the next person gets the default", async ({ page, local }) => {
-    const ids = await three(local);
-    await signIn(page);
-    await choose(page, "Delta");
-    await at(page, "/issues", ids.ended);
-    await page.getByRole("button", { name: /^Account menu for/ }).click();
-    await page.getByRole("menuitem", { name: "Sign out" }).click();
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await expect(page).toHaveURL((url) => !url.searchParams.has("contest"));
-    await page.getByLabel("Username", { exact: true }).fill("jury");
-    await page.getByLabel("Password", { exact: true }).fill(randomUUID());
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(triggerFor(page, "Charlie")).toBeVisible();
-    await at(page, "/issues", ids.running);
-  });
-
-  test("keeps another parameter of the address on sign-out", async ({ page, local }) => {
-    await three(local);
-    await signIn(page);
-    await page.goto("/issues?contest=bogus&keep=1");
-    await expect(triggerFor(page, "Charlie")).toBeVisible();
-    await page.getByRole("button", { name: /^Account menu for/ }).click();
-    await page.getByRole("menuitem", { name: "Sign out" }).click();
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await expect(page).toHaveURL((url) => !url.searchParams.has("contest") && url.searchParams.get("keep") === "1");
-  });
-
   test("opens the contest that a signed-out visit named, once the person signs in", async ({ page, local }) => {
     const ids = await three(local);
     await page.goto(`/issues?contest=${ids.ended}`);
@@ -466,11 +437,11 @@ test.describe("a contestant with several contests", () => {
   });
 });
 
-// A sign-out must not leave the contest of the person who chose it in any address
-// that the tab shows before the next sign-in. The phone screens above the home each
-// hold a history entry, and the unmount of those screens goes back one entry after
-// the sign-out. Browser Back reaches the entries below the same way.
-test.describe("a tab that signed out", () => {
+// The address keeps the choice of the person who made it, and the history entry names that
+// account. The next person on the tab starts from the default contest wherever the tab lands:
+// on the entry below a phone screen, after Back, after a reload or after a page load. Each test
+// first checks that the address still names Delta, so that only the rule can send the next person to Charlie.
+test.describe("the next person on a tab", () => {
   const signOut = async (page: Page) => {
     await page.getByRole("button", { name: /^Account menu for/ }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();
@@ -482,8 +453,6 @@ test.describe("a tab that signed out", () => {
     await page.getByLabel("Password", { exact: true }).fill(randomUUID());
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
   };
-
-  const withoutContest = (page: Page) => expect(page).toHaveURL((url) => !url.searchParams.has("contest"));
 
   const signInHeading = (page: Page) => page.getByRole("heading", { name: "Sign in", exact: true });
 
@@ -503,44 +472,40 @@ test.describe("a tab that signed out", () => {
     await at(page, "/account", ids.ended);
   };
 
-  test("shows no contest after Back, and the next sign-in opens the default", async ({ page, local }) => {
+  test("opens the default for the next person after a sign-out", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await choose(page, "Delta");
     await at(page, "/issues", ids.ended);
-    await page.getByRole("button", { name: /^Account menu for/ }).click();
-    await page.getByRole("menuitem", { name: "My account" }).click();
-    await at(page, "/account", ids.ended);
     await signOut(page);
-    await page.goBack();
-    await settle(page);
-    await expect(page).toHaveURL((url) => url.pathname === "/issues");
-    await withoutContest(page);
+    await at(page, "/issues", ids.ended);
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
-  // A reload ends the page, but the tab is still signed out, and Back loads the older entry anew.
-  test("shows no contest after a reload and Back, and the next sign-in opens the default", async ({ page, local }) => {
+  test("opens the default for the next person after a sign-out and Back", async ({ page, local }) => {
     const ids = await three(local);
-    await signIn(page);
-    await choose(page, "Delta");
+    await chooseDeltaThenMyAccount(page, ids);
+    await signOut(page);
+    await page.goBack();
+    await settle(page);
     await at(page, "/issues", ids.ended);
-    await page.getByRole("button", { name: /^Account menu for/ }).click();
-    await page.getByRole("menuitem", { name: "My account" }).click();
-    await at(page, "/account", ids.ended);
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
+  // A reload ends the page, and Back then loads the older entry as a page load.
+  test("opens the default for the next person after a sign-out, a reload and Back", async ({ page, local }) => {
+    const ids = await three(local);
+    await chooseDeltaThenMyAccount(page, ids);
     await signOut(page);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(signInHeading(page)).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await expect(page).toHaveURL((url) => url.pathname === "/issues");
-    await settle(page);
-    await withoutContest(page);
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/issues", ids.ended);
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
-  // Some browsers deny page storage, for example with every cookie blocked. A reload then ends
-  // everything that the page kept in memory, and Back loads the older entry as a page load.
+  // Some browsers deny page storage, for example with every cookie blocked. The rule must not need it.
   test("opens the default for the next person after a sign-out, a reload and Back when the browser denies page storage", async ({ page, local }) => {
     await page.addInitScript(() => {
       Object.defineProperty(window, "sessionStorage", {
@@ -556,7 +521,20 @@ test.describe("a tab that signed out", () => {
     await expect(signInHeading(page)).toBeVisible();
     await page.goBack();
     await expect(signInHeading(page)).toBeVisible();
-    await expect(page).toHaveURL((url) => url.pathname === "/issues");
+    await at(page, "/issues", ids.ended);
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
+  test("opens the default for the next person after a sign-out, a page load and two Back presses", async ({ page, local }) => {
+    const ids = await three(local);
+    await chooseDeltaThenMyAccount(page, ids);
+    await signOut(page);
+    await page.goto("/");
+    await page.goBack();
+    await expect(signInHeading(page)).toBeVisible();
+    await page.goBack();
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/issues", ids.ended);
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
@@ -640,28 +618,7 @@ test.describe("a tab that signed out", () => {
     await at(page, "/issues", ids.running);
   });
 
-  // Only a sign-in ends the state of the tab. A page load that the person starts adds an entry, and
-  // Back then loads the older entries as page loads too. Nothing tells those entries from a link.
-  test("shows no contest after a page load and two Back presses, and the next sign-in opens the default", async ({ page, local }) => {
-    const ids = await three(local);
-    await signIn(page);
-    await choose(page, "Delta");
-    await at(page, "/issues", ids.ended);
-    await page.getByRole("button", { name: /^Account menu for/ }).click();
-    await page.getByRole("menuitem", { name: "My account" }).click();
-    await at(page, "/account", ids.ended);
-    await signOut(page);
-    await page.goto("/");
-    await page.goBack();
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await page.goBack();
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await expect(page).toHaveURL((url) => url.pathname === "/issues");
-    await settle(page);
-    await withoutContest(page);
-    await nextPersonGetsTheDefault(page, ids.running);
-  });
-
+  // A link has no owner, so it keeps its contest for whoever signs in.
   test("opens the contest of a link that the next person opens in a tab that signed out", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
@@ -674,7 +631,6 @@ test.describe("a tab that signed out", () => {
   });
 
   // Another tab can sign in after this tab signed out, and the cookie then gives this tab a session.
-  // While the page restores that session, nobody is signed in yet. The page must not strip the contest then.
   test("keeps the contest of a link when another tab has signed in since this tab signed out", async ({ page, local, context }) => {
     const ids = await three(local);
     await signIn(page);
@@ -700,22 +656,36 @@ test.describe("a tab that signed out", () => {
       return ids;
     }
 
-    test("shows no contest after a sign-out from the report form, and the next sign-in opens the default", async ({ page, local }) => {
+    // The report form takes a history entry, and its unmount after the sign-out goes back one entry.
+    test("opens the default for the next person after a sign-out from the report form", async ({ page, local }) => {
       const ids = await openReportForm(page, local);
       await signOut(page);
       await settle(page);
-      await withoutContest(page);
+      await at(page, "/issues", ids.ended);
       await nextPersonGetsTheDefault(page, ids.running);
     });
 
-    test("shows no contest after the session ends with the report form open, and the next sign-in opens the default", async ({ page, local }) => {
+    test("opens the default for the next person after the session ends with the report form open", async ({ page, local }) => {
       const ids = await openReportForm(page, local);
       await page.route("**/api/auth/session*", (route) => route.fulfill({ status: 401, json: {} }));
       await focusEvent(page);
-      await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+      await expect(signInHeading(page)).toBeVisible();
       await page.unroute("**/api/auth/session*");
       await settle(page);
-      await withoutContest(page);
+      await at(page, "/issues", ids.ended);
+      await nextPersonGetsTheDefault(page, ids.running);
+    });
+
+    test("opens the default for the next person after a sign-out that follows a sent report", async ({ page, local }) => {
+      const ids = await openReportForm(page, local);
+      await page.getByText("Devices", { exact: true }).click();
+      await page.getByLabel("What is happening?").fill("The keyboard stopped working.");
+      await page.getByRole("button", { name: "Send report" }).click();
+      await expect(page.getByLabel("What is happening?")).toHaveCount(0);
+      await expect(page.getByText("The keyboard stopped working.").first()).toBeVisible();
+      await signOut(page);
+      await settle(page);
+      await at(page, "/issues", ids.ended);
       await nextPersonGetsTheDefault(page, ids.running);
     });
 
@@ -730,21 +700,8 @@ test.describe("a tab that signed out", () => {
       await expect(page.getByLabel("Current password", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Sign out", exact: true }).click();
       await expect(signInHeading(page)).toBeVisible();
-      await expect(page).toHaveURL((url) => url.pathname === "/account");
+      await at(page, "/account", ids.ended);
       await nextPersonGetsTheDefault(page, ids.running, { username: "contestant", path: "/account" });
-    });
-
-    test("shows no contest after a sign-out that follows a sent report, and the next sign-in opens the default", async ({ page, local }) => {
-      const ids = await openReportForm(page, local);
-      await page.getByText("Devices", { exact: true }).click();
-      await page.getByLabel("What is happening?").fill("The keyboard stopped working.");
-      await page.getByRole("button", { name: "Send report" }).click();
-      await expect(page.getByLabel("What is happening?")).toHaveCount(0);
-      await expect(page.getByText("The keyboard stopped working.").first()).toBeVisible();
-      await signOut(page);
-      await settle(page);
-      await withoutContest(page);
-      await nextPersonGetsTheDefault(page, ids.running);
     });
   });
 });

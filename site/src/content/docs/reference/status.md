@@ -57,4 +57,4 @@ Before you rely on an installation, record its source revision and verification 
 
 ## License
 
-An open-source license is not chosen yet.
+The code uses the Apache License 2.0. The documentation uses CC BY 4.0. See the repository README.

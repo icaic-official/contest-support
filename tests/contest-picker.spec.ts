@@ -507,6 +507,26 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
+  // A reload ends the page, but the tab is still signed out, and Back loads the older entry anew.
+  test("shows no contest after a reload and Back, and the next sign-in opens the default", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "My account" }).click();
+    await at(page, "/account", ids.ended);
+    await signOut(page);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(page).toHaveURL((url) => url.pathname === "/issues");
+    await settle(page);
+    await withoutContest(page);
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
   test.describe("on a phone", () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
@@ -525,6 +545,17 @@ test.describe("a tab that signed out", () => {
     test("shows no contest after a sign-out from the report form, and the next sign-in opens the default", async ({ page, local }) => {
       const ids = await openReportForm(page, local);
       await signOut(page);
+      await settle(page);
+      await withoutContest(page);
+      await nextPersonGetsTheDefault(page, ids.running);
+    });
+
+    test("shows no contest after the session ends with the report form open, and the next sign-in opens the default", async ({ page, local }) => {
+      const ids = await openReportForm(page, local);
+      await page.route("**/api/auth/session*", (route) => route.fulfill({ status: 401, json: {} }));
+      await focusEvent(page);
+      await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+      await page.unroute("**/api/auth/session*");
       await settle(page);
       await withoutContest(page);
       await nextPersonGetsTheDefault(page, ids.running);

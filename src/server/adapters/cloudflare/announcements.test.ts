@@ -347,7 +347,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
         return bucket.put(key, body, options);
       },
     });
-    await expect(transfer(image.path, { instance: late })).rejects.toMatchObject({ message: 'Image unavailable.' });
+    await expect(transfer(image.path, { instance: late })).rejects.toMatchObject({ validation: true });
     expect((await bucket.list({ prefix: `${fixture.sessionId}/` })).objects).toEqual([]);
   });
 

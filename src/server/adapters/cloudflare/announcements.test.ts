@@ -6,11 +6,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { getPlatformProxy } from 'wrangler';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
-import { FakeLiveNamespace } from '../d1/eventDeletionHarness';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
-import { advanceDeletions } from './eventDeletion';
 import { fenceFixtureEvent } from './eventDeletionFixture';
 import type { PrivateBucket } from './images';
 
@@ -337,25 +335,15 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     expect(await bytesOf(image.path, admin)).toEqual(png);
   });
 
-  it('removes its own file when the event deletion finishes while the transfer runs', async () => {
+  it('removes its own file when the event is fenced and the rows step removes the image during the transfer', async () => {
     const id = await publish();
     const image = await reserve(id);
-    const deleteEvent = async () => {
-      await fenceFixtureEvent(db, fixture.eventId);
-      const env = { DB: db, IMAGES: bucket, LIVE_UPDATES: new FakeLiveNamespace(db) };
-      for (let tick = 0; tick < 20; tick += 1) {
-        // A test cannot wait out the lease and the 65-minute file wait.
-        await statement(`UPDATE event_deletions SET lease_until = 0, rows_done_at = CASE WHEN rows_done_at IS NULL THEN NULL
-          ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-66 minutes') END WHERE event_id = ?`, fixture.eventId).run();
-        await advanceDeletions(env);
-        if (await statement(`SELECT 1 FROM event_deletions WHERE event_id = ? AND step = 'done'`, fixture.eventId).first()) return;
-      }
-      throw new Error('The deletion did not finish.');
-    };
     const late = new R2AnnouncementImageService(db, {
       get: (key, options) => bucket.get(key, options), delete: (keys) => bucket.delete(keys), list: (options) => bucket.list(options),
       put: async (key, body, options) => {
-        await deleteEvent();
+        // The file pass of the deletion can also be over by now, so no later step removes this file.
+        await fenceFixtureEvent(db, fixture.eventId);
+        await statement('DELETE FROM announcement_images WHERE id = ?', image.id).run();
         return bucket.put(key, body, options);
       },
     });

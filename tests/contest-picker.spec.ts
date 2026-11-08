@@ -475,7 +475,7 @@ test.describe("the next person on a tab", () => {
    * combined staff member joins Delta and Charlie, so only the rule keeps them
    * out of Delta, and Charlie stays their default.
    */
-  const oneContestOnTheChoiceBefore = async (page: Page, local: LocalWorker) => {
+  const oneContestOnTheChoiceBefore = async (page: Page, local: LocalWorker, path = "/issues") => {
     const ids = await three(local);
     await local.run(
       "DELETE FROM teams WHERE entrant_id = ? AND session_id IN (?, ?)",
@@ -493,14 +493,15 @@ test.describe("the next person on a tab", () => {
     }
     await signIn(page, "jury");
     await choose(page, "Delta");
-    await at(page, "/issues", ids.ended);
+    if (path === "/account") await page.getByRole("button", { name: /^Account settings for/ }).click();
+    await at(page, path, ids.ended);
     await page.context().clearCookies();
     await page.reload();
     await expect(signInHeading(page)).toBeVisible();
     await signInHere(page);
     await expect(page.locator('[data-ui="contestant"]')).toBeVisible({ timeout: 15_000 });
     await expect(trigger(page)).toHaveCount(0);
-    await at(page, "/issues", ids.ended);
+    await at(page, path, ids.ended);
     return ids;
   };
 
@@ -724,6 +725,18 @@ test.describe("the next person on a tab", () => {
     await expect(signInHeading(page)).toBeVisible();
     await at(page, "/issues", ids.ended, "#contestant-main");
     await nextPersonGetsTheDefault(page, ids.running, { username: "combined", hash: "#contestant-main" });
+  });
+
+  test("opens the default for the next person after a person with one contest follows an account section link on the choice before", async ({ page, local }) => {
+    const ids = await oneContestOnTheChoiceBefore(page, local, "/account");
+    await page.getByRole("navigation", { name: "Account sections" }).getByRole("link", { name: "Security" }).click();
+    await expect(page.locator("#security")).toBeFocused();
+    await at(page, "/account", ids.ended, "#security");
+    await signOut(page);
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/account", ids.ended, "#security");
+    await nextPersonGetsTheDefault(page, ids.running, { username: "combined", path: "/account", hash: "#security" });
   });
 
   // The report form takes a history entry. A page load leaves the tab on that entry, because no unmount goes back.

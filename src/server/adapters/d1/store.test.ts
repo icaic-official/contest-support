@@ -835,5 +835,85 @@ describe("D1 workflow persistence", () => {
         .toEqual({ outcome: 'rejected', reason: 'state' });
       expect((await fixture.durableState()).awards).toEqual([]);
     });
+
+    describe('withdrawing an unconfirmed issue award', () => {
+      const withdraw = (revision: number): Command => ({ type: 'withdraw_award', issue_id: fixture.issueId, revision });
+      const awardRow = async () => (await fixture.rows(
+        'SELECT applied_at, withdrawn_at, withdrawn_by, withdrawn_name FROM awards WHERE issue_id = ?', fixture.issueId))[0]!;
+      async function awarded() {
+        await resolvedIssue();
+        await giveJury();
+        expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 3, minutes: 5, explanation: 'Fixture award' }))
+          .toMatchObject({ outcome: 'committed' });
+      }
+
+      it('keeps the row, tells the team, hides it from the team, and refuses a second award', async () => {
+        await awarded();
+        const teamSignals = async () => (await fixture.rows('SELECT id FROM notifications WHERE audience = ?', `team:${fixture.teamId}`)).length;
+        const before = await teamSignals();
+        const requestId = randomUUID();
+        expect(await command(withdraw(4), fixture.staff, requestId)).toEqual({ outcome: 'committed', issueId: fixture.issueId });
+        expect(await awardRow()).toMatchObject({ applied_at: null, withdrawn_by: fixture.staff.accountId, withdrawn_name: expect.any(String) as string });
+        expect(await teamSignals()).toBe(before + 1);
+        expect(await fixture.rows("SELECT visibility FROM history WHERE issue_id = ? AND text LIKE 'Time award withdrawn%'", fixture.issueId))
+          .toEqual([{ visibility: 'public' }]);
+
+        const staffView = await application.snapshot(fixture.staff, fixture.sessionId);
+        expect(staffView.awards).toMatchObject([{ withdrawn_at: expect.any(String) as string }]);
+        expect((await application.snapshot(fixture.contestant, fixture.sessionId)).awards).toEqual([]);
+
+        // The same request returns the first outcome without a second write.
+        expect(await command(withdraw(4), fixture.staff, requestId)).toEqual({ outcome: 'committed', issueId: fixture.issueId });
+        expect(await fixture.rows("SELECT id FROM history WHERE issue_id = ? AND text LIKE 'Time award withdrawn%'", fixture.issueId)).toHaveLength(1);
+        expect(await command(withdraw(5))).toEqual({ outcome: 'rejected', reason: 'state' });
+        expect(await command({ type: 'apply', issue_id: fixture.issueId, revision: 5 })).toEqual({ outcome: 'rejected', reason: 'state' });
+        expect(await command({ type: 'award', issue_id: fixture.issueId, revision: 5, minutes: 3, explanation: 'Corrected award' }))
+          .toEqual({ outcome: 'rejected', reason: 'state' });
+        expect(await fixture.rows('SELECT id FROM awards WHERE issue_id = ?', fixture.issueId)).toHaveLength(1);
+      });
+
+      it('lets only jury withdraw, and never a confirmed award', async () => {
+        await awarded();
+        expect(await command(withdraw(4), fixture.specialist)).toEqual({ outcome: 'rejected', reason: 'state' });
+        expect(await command(withdraw(4), fixture.contestant)).toMatchObject({ outcome: 'rejected' });
+        expect((await awardRow()).withdrawn_at).toBeNull();
+        expect(await command({ type: 'apply', issue_id: fixture.issueId, revision: 4 }, fixture.specialist)).toMatchObject({ outcome: 'committed' });
+        expect(await command(withdraw(5))).toEqual({ outcome: 'rejected', reason: 'state' });
+        expect((await awardRow()).withdrawn_at).toBeNull();
+      });
+
+      it('lets exactly one of a concurrent confirmation and withdrawal win', async () => {
+        await awarded();
+        const results = await Promise.all([
+          command({ type: 'apply', issue_id: fixture.issueId, revision: 4 }, fixture.specialist),
+          command(withdraw(4)),
+        ]);
+        expect(results.map((result) => result.outcome).sort()).toEqual(['committed', 'rejected']);
+        const row = await awardRow();
+        expect([row.applied_at !== null, row.withdrawn_at !== null].sort()).toEqual([false, true]);
+      });
+
+      it('refuses a withdrawal in an archived event', async () => {
+        await awarded();
+        await fixture.statement('UPDATE events SET archived = 1 WHERE id = ?', fixture.eventId).run();
+        expect(await command(withdraw(4))).toEqual({ outcome: 'rejected', reason: 'access' });
+        await fixture.statement('UPDATE events SET archived = 0 WHERE id = ?', fixture.eventId).run();
+        expect((await awardRow()).withdrawn_at).toBeNull();
+      });
+
+      it('refuses a half-written withdrawal, a confirmed withdrawal, and any change to a withdrawn award', async () => {
+        await awarded();
+        const now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+        await expect(fixture.statement(`UPDATE awards SET withdrawn_at = ${now} WHERE issue_id = ?`, fixture.issueId).run())
+          .rejects.toThrow(/not both/);
+        expect(await command(withdraw(4))).toMatchObject({ outcome: 'committed' });
+        // The previous Worker confirms with this statement. It must fail on a withdrawn award.
+        await expect(fixture.statement(`UPDATE awards SET applied_at = ${now}, applied_by = ?, applied_name = 'Fictional person'
+          WHERE issue_id = ? AND applied_at IS NULL`, fixture.staff.accountId, fixture.issueId).run()).rejects.toThrow(/final|not both/);
+        await expect(fixture.statement("UPDATE awards SET explanation = 'Changed' WHERE issue_id = ?", fixture.issueId).run())
+          .rejects.toThrow(/final/);
+        expect((await awardRow()).applied_at).toBeNull();
+      });
+    });
   });
 });

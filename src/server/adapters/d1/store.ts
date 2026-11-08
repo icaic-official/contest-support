@@ -21,6 +21,7 @@ interface WorkflowColumns {
   resolution_id: string | null;
   award_id: string | null;
   applied_at: string | null;
+  withdrawn_at: string | null;
   dependency: string;
 }
 
@@ -44,7 +45,7 @@ const workflowSql = `SELECT c.account_name AS actor_name, c.team_id AS membershi
     (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t) AS teams,
     i.id AS issue_id, i.team_id, i.status, i.owner, i.public_revision,
     (SELECT id FROM resolutions WHERE issue_id = i.id AND reopened_at IS NULL) AS resolution_id,
-    aw.id AS award_id, aw.applied_at,
+    aw.id AS award_id, aw.applied_at, aw.withdrawn_at,
     json_object('authority', json(c.stamp), 'name', c.account_name, 'expires', c.identity_expires_at,
       'teams', (SELECT json_group_array(t.id) FROM (SELECT id FROM teams WHERE session_id = s.id AND id IN (c.team_id, ?) ORDER BY id) t),
       'intake', ${intakeOpen},
@@ -52,7 +53,7 @@ const workflowSql = `SELECT c.account_name AS actor_name, c.team_id AS membershi
       'resolutions', (SELECT json_group_array(json_object('id', r.id, 'at', r.at, 'reopened_at', r.reopened_at,
         'reopened_by', r.reopened_by, 'summary', r.summary, 'reason', r.reason))
         FROM (SELECT * FROM resolutions WHERE issue_id = i.id ORDER BY id) r),
-      'award', json_object('id', aw.id, 'applied_at', aw.applied_at, 'applied_by', aw.applied_by,
+      'award', json_object('id', aw.id, 'applied_at', aw.applied_at, 'applied_by', aw.applied_by, 'withdrawn_at', aw.withdrawn_at,
         'minutes', aw.minutes, 'explanation', aw.explanation, 'resolution', aw.resolution_id)) AS dependency,
     cr.command AS receipt_command, cr.session_id AS receipt_session, cr.issue_id AS receipt_issue
   FROM (${contestDataSql('caller')}) c
@@ -90,7 +91,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
         issue: row.issue_id && row.status && row.team_id && row.public_revision !== null
           ? { id: row.issue_id, team_id: row.team_id, status: row.status, owner: row.owner, revision: row.public_revision } : null,
         resolution: row.resolution_id ? { id: row.resolution_id } : null,
-        award: row.award_id ? { id: row.award_id, applied_at: row.applied_at } : null,
+        award: row.award_id ? { id: row.award_id, applied_at: row.applied_at, withdrawn_at: row.withdrawn_at } : null,
       },
       dependency: row.dependency,
       receipt: row.receipt_command === null ? null : {
@@ -187,8 +188,13 @@ export class D1ApplicationStore implements WorkflowPersistence {
     }
     if (decision.apply) {
       statements.push(this.statement(`UPDATE awards SET applied_at = ${at}, applied_by = ?, applied_name = ?
-        WHERE id = ? AND issue_id = ? AND applied_at IS NULL`, caller.accountId, read.state.actor.name,
+        WHERE id = ? AND issue_id = ? AND applied_at IS NULL AND withdrawn_at IS NULL`, caller.accountId, read.state.actor.name,
       decision.apply.awardId, issueId), assertion('apply', 'changes() = 1'));
+    }
+    if (decision.withdraw) {
+      statements.push(this.statement(`UPDATE awards SET withdrawn_at = ${at}, withdrawn_by = ?, withdrawn_name = ?
+        WHERE id = ? AND issue_id = ? AND applied_at IS NULL AND withdrawn_at IS NULL`, caller.accountId, read.state.actor.name,
+      decision.withdraw.awardId, issueId), assertion('withdraw', 'changes() = 1'));
     }
     // Record authenticated history and the receipt in the same transaction.
     statements.push(

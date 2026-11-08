@@ -316,6 +316,8 @@ describe("issueAbilities and primaryAction", () => {
       at: "2026-10-17T11:00:00Z",
       applied_at: null,
       applied_name: null,
+      withdrawn_at: null,
+      withdrawn_name: null,
     };
     const after = issueAbilities(resolved, { ...noAwards, awards: [award] }, jury);
     expect(after.award).toBe(false);
@@ -329,6 +331,25 @@ describe("issueAbilities and primaryAction", () => {
       jury,
     );
     expect(primaryAction(applied)).toBeUndefined();
+    expect(applied.withdraw).toBe(false);
+  });
+
+  it("lets only the jury withdraw a pending award, and leaves nothing to do after it", () => {
+    const resolved = issue({ status: "resolved" });
+    const pending = {
+      id: "award", issue_id: "issue", resolution_id: "r", minutes: 5,
+      explanation: "Lost time", actor_name: "Jury", at: "2026-10-17T11:00:00Z",
+      applied_at: null, applied_name: null, withdrawn_at: null, withdrawn_name: null,
+    };
+    const jury = member({ roles: ["jury"] });
+    expect(issueAbilities(resolved, { ...noAwards, awards: [pending] }, jury).withdraw).toBe(true);
+    expect(issueAbilities(resolved, { ...noAwards, awards: [pending] }, member({ roles: ["volunteer"] })).withdraw).toBe(false);
+    const withdrawn = issueAbilities(
+      resolved,
+      { ...noAwards, awards: [{ ...pending, withdrawn_at: "2026-10-17T11:05:00Z", withdrawn_name: "Jury" }] },
+      jury,
+    );
+    expect(withdrawn).toMatchObject({ award: false, apply: false, withdraw: false });
   });
 
   it("lets support staff reopen a resolved issue", () => {
@@ -455,6 +476,8 @@ describe("jury award lists (T0009)", () => {
       at,
       applied_at: appliedAt,
       applied_name: appliedAt ? "Lead" : null,
+      withdrawn_at: null,
+      withdrawn_name: null,
     };
   }
   function state(overrides: Partial<Snapshot>): Snapshot {

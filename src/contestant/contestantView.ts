@@ -75,9 +75,10 @@ export function conversation(
   },
 ): ConversationItem[] {
   const { userId } = context;
+  const awardWithdrawn = entries.some((entry) => workflowEvent(entry, context)?.kind === "withdrawn");
   return entries.map((entry): ConversationItem => {
     const who = entry.actor === userId ? "You" : entry.actor_name;
-    const event = workflowEvent(entry, context);
+    const event = workflowEvent(entry, { ...context, awardWithdrawn });
     if (!event) return { kind: "message", entry, mine: entry.actor === userId };
     return { kind: "event", entry, text: eventText(event, who) };
   });
@@ -106,6 +107,8 @@ function eventText(event: WorkflowEvent, who: string): string {
       return `${who} reopened the issue: ${event.reason}`;
     case "awarded":
       return "The jury decided a time award";
+    case "withdrawn":
+      return "The jury withdrew the time award";
   }
 }
 

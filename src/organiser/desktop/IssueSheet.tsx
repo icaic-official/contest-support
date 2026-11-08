@@ -27,6 +27,7 @@ import { CommandFeedback } from "../actions/ActionSheet";
 import {
   ApplyForm,
   AwardForm,
+  WithdrawAwardForm,
   EscalateForm,
   ReopenForm,
   type ReplyDraft,
@@ -177,6 +178,7 @@ function IssueSheetBody({
   const disabled = command.locked;
   const decideId = `decide-${issue.id}`;
   const applyId = `apply-${issue.id}`;
+  const withdrawId = `withdraw-${issue.id}`;
   // The tab can already be open, so focus moves either way. The panel is
   // still hidden until React renders, so focus waits one frame.
   const showOutcome = (headingId: string) => {
@@ -428,6 +430,20 @@ function IssueSheetBody({
                   Confirm external application
                 </h2>
                 <ApplyForm issue={issue} command={command} onDone={() => {}} />
+              </section>
+            )}
+            {can.withdraw && (
+              <section
+                aria-labelledby={withdrawId}
+                className="rounded-xl border p-4"
+              >
+                <h2
+                  id={withdrawId}
+                  className="mb-3 text-sm font-semibold"
+                >
+                  Withdraw award
+                </h2>
+                <WithdrawAwardForm issue={issue} command={command} onDone={() => {}} />
               </section>
             )}
             {!award &&

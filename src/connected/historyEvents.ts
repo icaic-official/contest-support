@@ -12,7 +12,8 @@ export type WorkflowEvent =
   | { kind: "applied" }
   | { kind: "resolved" }
   | { kind: "reopened"; reason: string }
-  | { kind: "awarded" };
+  | { kind: "awarded" }
+  | { kind: "withdrawn" };
 
 /** The start of the text that the server stores for an award. */
 const awardedText = /^(\d+) minutes awarded: /;
@@ -34,6 +35,8 @@ export function workflowEvent(
     issue: Issue;
     resolutions: readonly Resolution[];
     award: Award | undefined;
+    /** The issue's history records a withdrawn award. */
+    awardWithdrawn?: boolean;
   },
 ): WorkflowEvent | undefined {
   const { issue, resolutions, award } = context;
@@ -66,7 +69,10 @@ export function workflowEvent(
   ) {
     return { kind: "reopened", reason: value.slice("Reopened: ".length) };
   }
-  if (awardedText.test(value) && sameTime(award?.at, entry.at)) {
+  if (value === "Time award withdrawn. It gives no time.") return { kind: "withdrawn" };
+  // A team never reads a withdrawn award, so its decision entry has no award to match.
+  const decided = award ? sameTime(award.at, entry.at) : Boolean(context.awardWithdrawn);
+  if (awardedText.test(value) && decided) {
     return { kind: "awarded" };
   }
   return undefined;

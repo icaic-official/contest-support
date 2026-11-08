@@ -87,7 +87,7 @@ describe('shared workflow compatibility edges', () => {
     expect(awarded).toMatchObject({ award: { minutes: 0, resolutionId: 'resolution' } });
   });
   it('describes a reopened award confirmation without changing the owner or timer', () => {
-    const decision = decideWorkflow({ ...state, issue: { ...state.issue!, status: 'claimed' }, award: { id: 'award', applied_at: null } },
+    const decision = decideWorkflow({ ...state, issue: { ...state.issue!, status: 'claimed' }, award: { id: 'award', applied_at: null, withdrawn_at: null } },
       { type: 'apply', issue_id: issueId, revision: 0 });
     expect(decision).toMatchObject({ apply: { awardId: 'award' } });
     expect(decision).not.toHaveProperty('issue');

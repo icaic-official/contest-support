@@ -48,7 +48,7 @@ export function juryWorklists(state: Snapshot): Record<JurySection, JuryRow[]> {
       award,
     };
     if (award) {
-      if (award.applied_at === null) lists.application.push(row);
+      if (award.applied_at === null && award.withdrawn_at === null) lists.application.push(row);
     } else if (issue.status === "resolved") {
       lists.decision.push(row);
     }

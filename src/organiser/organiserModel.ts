@@ -253,6 +253,7 @@ export interface IssueAbilities {
   internalNotes: boolean;
   award: boolean;
   apply: boolean;
+  withdraw: boolean;
   upload: boolean;
 }
 
@@ -267,6 +268,7 @@ const noAbilities: Readonly<IssueAbilities> = {
   internalNotes: false,
   award: false,
   apply: false,
+  withdraw: false,
   upload: false,
 };
 
@@ -300,8 +302,10 @@ export function issueAbilities(
     reopen: !active && (support || member.team_id === issue.team_id),
     reply: active && staff,
     internalNotes: staff,
+    // A withdrawn award keeps its row, so the issue takes no second award.
     award: !active && !award && jury,
-    apply: Boolean(award && !award.applied_at && (support || jury)),
+    apply: Boolean(award && !award.applied_at && !award.withdrawn_at && (support || jury)),
+    withdraw: Boolean(award && !award.applied_at && !award.withdrawn_at && jury),
     upload: staff,
   };
 }
@@ -355,6 +359,7 @@ export type IssueSheetKind =
   | "reopen"
   | "award"
   | "apply"
+  | "withdraw"
   | "image"
   | "more";
 

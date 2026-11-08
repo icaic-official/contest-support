@@ -40,7 +40,9 @@ export default defineConfig({
         {label: 'Volunteers and specialists', slug: 'guides/staff'},
         {label: 'Jury', slug: 'guides/jury'},
         {label: 'Announcements', slug: 'guides/announcements'},
-        {label: 'Session admins', slug: 'guides/administration'},
+        {label: 'Contest admins', slug: 'guides/administration'},
+        {label: 'Event admins', slug: 'guides/event-admin'},
+        {label: 'Webmasters', slug: 'guides/webmaster'},
       ]},
       {label: 'Operate', items: [
         {label: 'Install Cloudflare', slug: 'operators/installation'},

@@ -16,7 +16,7 @@ There is no public registration.
 The device remembers the event code for the next sign-in. If the form shows no code, type the code from your sign-in details.
 A wrong event code, username, or password gives the same message. Check all three with your organizer.
 
-Webmasters run the whole site and belong to no event. A webmaster selects **Site sign-in** on the sign-in page, which asks for no event code.
+Webmasters run the whole site and belong to no event. A webmaster selects **Site sign-in** on the sign-in page, which asks for no event code. See [Run the site as a webmaster](/guides/webmaster/).
 
 Teams share one account. Each staff member has a personal account, so the history shows who acted.
 
@@ -45,12 +45,13 @@ An account with no session membership sees no data. Ask your organizer to add yo
 | Staff, window 1024 px or wider | Console with a sidebar. |
 
 Your roles decide the tabs and pages. Several roles combine.
+Event admins also see **Event console**, and webmasters also see **Site**. See [Run an event](/guides/event-admin/).
 
 | Role | Phone tabs | Console pages |
 | --- | --- | --- |
 | Volunteer or specialist | **Queue**, **Mine**, **Find**, **Me** | **Queue**, **Assigned to me**, **Handoffs**, **Teams & tables** |
 | Jury | **Awards**, **Find**, **Me** | **Award review**, **Teams & tables** |
-| Session admin | adds **Session** | adds **Overview**, **Accounts**, **Session settings** |
+| Contest admin | adds **Session** | adds **Overview**, **Accounts**, **Session settings** |
 
 Open your account settings to change your password, switch session, choose a theme or sign out.
 In the console, select your name at the bottom of the sidebar. As a contestant, open the account menu at the top right and select **My account**. On a phone, use the **Me** tab.

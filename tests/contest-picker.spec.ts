@@ -546,18 +546,37 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
-  // A link that the person opens by a page load is a new visit, not a return to an older address.
-  test("keeps the contest of a link that the person opens after a sign-out", async ({ page, local }) => {
+  // Only a sign-in ends the state of the tab. A page load that the person starts adds an entry, and
+  // Back then loads the older entries as page loads too. Nothing tells those entries from a link.
+  test("shows no contest after a page load and two Back presses, and the next sign-in opens the default", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "My account" }).click();
+    await at(page, "/account", ids.ended);
+    await signOut(page);
+    await page.goto("/");
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(page).toHaveURL((url) => url.pathname === "/issues");
+    await settle(page);
+    await withoutContest(page);
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
+  test("ignores the contest of a link that the person opens in a tab that signed out", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await signOut(page);
     await page.goto(`/issues?contest=${ids.ended}`);
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
     await settle(page);
-    await at(page, "/issues", ids.ended);
-    await signInHere(page);
-    await expect(triggerFor(page, "Delta")).toBeVisible();
-    await at(page, "/issues", ids.ended);
+    await withoutContest(page);
+    await nextPersonGetsTheDefault(page, ids.running);
   });
 
   test.describe("on a phone", () => {

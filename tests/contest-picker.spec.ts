@@ -385,6 +385,35 @@ test.describe("a contestant with several contests", () => {
     });
   }
 
+  // The address holds the choice of the person who signed in. The next person on the tab starts
+  // from the default. A signed-out visit to a shared link still keeps its contest (test below).
+  test("clears the contest from the address on sign-out, so the next person gets the default", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(page).toHaveURL((url) => !url.searchParams.has("contest"));
+    await page.getByLabel("Username", { exact: true }).fill("jury");
+    await page.getByLabel("Password", { exact: true }).fill(randomUUID());
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await at(page, "/issues", ids.running);
+  });
+
+  test("keeps another parameter of the address on sign-out", async ({ page, local }) => {
+    await three(local);
+    await signIn(page);
+    await page.goto("/issues?contest=bogus&keep=1");
+    await expect(triggerFor(page, "Charlie")).toBeVisible();
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(page).toHaveURL((url) => !url.searchParams.has("contest") && url.searchParams.get("keep") === "1");
+  });
+
   test("opens the contest that a signed-out visit named, once the person signs in", async ({ page, local }) => {
     const ids = await three(local);
     await page.goto(`/issues?contest=${ids.ended}`);

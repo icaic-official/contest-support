@@ -297,7 +297,7 @@ test.describe("on a device that last showed the organiser screen", () => {
     });
   }
 
-  test("the organiser's next visit still starts the staff download before the session read ends", async ({ page }) => {
+  test("the organiser's next visit still starts the staff download before the snapshot read ends", async ({ page }) => {
     await signInOrganiser(page);
     const release = await holdSnapshot(page);
     const scripts = watchScripts(page);

@@ -4,7 +4,7 @@ description: Reset passwords, change usernames, edit team locations and categori
 ---
 
 A contest admin manages the settings of one contest. Event admins and webmasters can do the same in every contest of their event.
-Use the **Session** tab (phone) or the **Accounts**, **Roster**, and **Session settings** pages (console).
+Use the **Session** tab (phone) or the **Accounts**, **Team locations**, and **Session settings** pages (console).
 
 An event admin creates accounts, contests, and schedules, and assigns people, in the event console. See [Run an event](/guides/event-admin/).
 
@@ -17,13 +17,15 @@ An event admin creates accounts, contests, and schedules, and assigns people, in
 Minsky refuses a reset that would sign a contestant out of an open contest that the reset does not name. A reset from the contest's own page or from **Entrants** names the open contest. If the contestant has a second open contest, close it first, or wait until it ends.
 
 The reset signs the account out everywhere. History stays. The account keeps its username.
-Resets and username changes affect the whole account. A contest admin can use them only for an account that sits in no other contest. An event admin can use them for every account of the event.
+Resets and username changes affect the whole account. A contest admin can use them only for an account that is assigned to contests and whose every contest is one that this contest admin manages. A contest admin cannot use them for an event admin or a webmaster. An event admin can use them for every account of the event.
 
 ## Change a username
 
 1. Open the account sheet (phone) or **Manage** (console).
 2. Enter the new username in **Change username**, and select **Change username**.
-3. Tell the person their new username. Print a new sheet for a team.
+3. Tell the person their new username.
+
+This form is for staff accounts. A team account shows no username form.
 
 The password stays, and open sessions stay signed in. An older account without a username gets one here. Then reset its password, so that it can sign in.
 

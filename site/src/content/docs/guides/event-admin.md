@@ -49,7 +49,7 @@ A new contest has one category, **General**. A contest admin changes the categor
 
 Intake opens at the start. It closes at the end plus the grace period. A contestant's own end time also includes the extra minutes that staff confirmed as applied.
 
-If a time does not exist in the event's zone, because clocks move forward, Minsky uses the first minute after the gap. If a time occurs twice, Minsky uses the earlier one.
+If a time does not exist in the event's zone, because clocks move forward, Minsky moves the time forward by the length of the gap. For example, 02:30 in a gap from 02:00 to 03:00 becomes 03:30. If a time occurs twice, Minsky uses the earlier one.
 
 ### Change a contest
 
@@ -91,7 +91,7 @@ Minsky creates the entrants and their sign-ins, and opens the credential sheet. 
 To rename an entrant, select the pencil button, enter the name, and select **Save name**. The new name shows in every contest of the entrant.
 An entrant without a sign-in shows **Add sign-in**. Select it, enter a username, and select **Set username**. Minsky then issues the password.
 
-To change the username of an entrant sign-in, use the contest console. See [Change a username](/guides/administration/#change-a-username). A team cannot change its own username.
+You cannot change the username of an entrant sign-in in the interface. A team cannot change it either. If a sign-in sheet is lost, reset the password instead. See [Recover a password](#recover-a-password).
 
 ## Assign entrants and staff
 
@@ -117,7 +117,7 @@ Every person of the event shows under **Staff in** the contest name.
 2. Select **Assign**. For a person who is already in the contest, select **Update**.
 
 To take a person out of the contest, select **Remove**. History still names the person.
-Event admins reach every contest without an assignment. To work issues or record awards, an event admin also needs a role. See [Time awards and extra time](#time-awards-and-extra-time).
+Event admins reach every contest without an assignment. Without a role, an event admin can resolve issues, post announcements, and change contest settings. To claim, hand off, or reopen issues, or to record awards, an event admin also needs a role. See [Time awards and extra time](#time-awards-and-extra-time).
 
 ## Share passwords and print sheets
 
@@ -153,7 +153,7 @@ When the count reaches zero, the row disappears, and the contest follows its sch
 These changes affect a live contest:
 
 - **A password change by the person.** The contest stays ready.
-- **A reset by staff.** The contest closes until that sign-in has a new password.
+- **A reset by staff.** The reset names one contest, and the new password counts for it. Other live contests of that sign-in that have not ended close until you issue a password for them again. The dialog names them under **These passwords stop working for**.
 - **A new entrant or a new sign-in while reporting is open.** Minsky asks first and names the number of teams. If you confirm, reporting closes for every team, and Minsky opens the credential sheet. Reporting opens again when the last password is issued.
 - **A moved contest.** If the new times no longer overlap the times that the passwords were issued for, the passwords no longer count, and the contest waits for new ones. An end extension, or a move that still overlaps, keeps them. If the move would stop a contest that should still be running, Minsky refuses it. Close reporting first.
 - **A password for a later contest.** If the person holds a password for a live contest that has not ended, Minsky names it under **These passwords stop working for**. Issue for that contest again later.
@@ -167,7 +167,7 @@ Minsky records awards and confirmations. It does not change the clock of the ext
 - Staff with the **Volunteer**, **Specialist**, or **Jury** role select **Confirm applied externally** after they apply the minutes in the external contest system.
 - A contestant's end time grows only by confirmed minutes. The contestant can report until that end time plus the grace period.
 
-To record or confirm awards yourself, assign yourself the role on the **Assignments** tab. For the steps, see [Record time awards](/guides/jury/).
+To record or confirm awards yourself, assign yourself the role on the **Assignments** tab. A webmaster belongs to no event, so a webmaster cannot take a role this way. For the steps, see [Record time awards](/guides/jury/).
 
 ## See the calendar
 
@@ -192,7 +192,7 @@ Minsky sends no email. A person who forgets a password asks an organizer.
 
 The old password stops working at once, for everyone who shares it. Every open session of the account ends. The account keeps its username and history.
 
-Minsky refuses a reset that would sign a contestant out of an open contest that the reset does not name. A reset from the **Entrants** tab names one contest of the entrant: an open live contest first, then the next live contest. If the contestant is in a second open contest, close it first, or wait until it ends.
+Minsky refuses a reset that would sign a contestant out of an open contest that the reset does not name. A reset from the **Entrants** tab names one contest of the entrant: an open live contest first, then the next live contest, then any other open contest. If the contestant is in a second open contest, close it first, or wait until it ends.
 
 An event admin can reset every account of the event, also the other event admins. Only a webmaster can reset a webmaster.
 A contest admin can also reset some accounts from the contest console. See [Reset a password](/guides/administration/#reset-a-password).
@@ -203,4 +203,5 @@ The event console has no control for these changes:
 
 - The name, the code, or the time zone of the event.
 - The kind of a contest.
+- Any change while the event is being deleted. Every control is then unavailable.
 - The deletion of a contest, a person, or an entrant. A webmaster can delete the whole event. See [Delete an event permanently](/guides/webmaster/#delete-an-event-permanently).

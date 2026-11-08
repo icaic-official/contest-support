@@ -15,8 +15,8 @@ You need these items:
 
 ## Sign in
 
-1. Open the site address.
-2. Select **Site sign-in**. This form asks for no event code.
+1. Open the site address, and select **Sign in**.
+2. On the sign-in form, select **Site sign-in**. This form asks for no event code.
 3. Enter your username and password, and select **Sign in**.
 4. If the password is temporary, set a new password.
 
@@ -42,7 +42,7 @@ Each event has one event code. People type the code, or open a link that holds i
 
 Minsky creates the event and the event admin's account, and shows **First event admin of** the event name. The dialog shows the sign-in link, the username, and the temporary password once. Give them to the event admin in person.
 
-If the dialog says that the event exists but the first admin has no password yet, open the event console. On the **People** tab, select **Issue password** for that admin.
+If a line under the **Events** list says that the event exists but its first admin has no password yet, select **Open console**. On the **People** tab, select **Issue password** for that admin.
 
 You cannot change the name, the code, or the time zone of an event after you create it.
 
@@ -69,7 +69,7 @@ To add a webmaster:
 3. Select **Add webmaster**.
 
 The dialog **Webmaster password** shows the new temporary password once. Give it to the webmaster in person.
-If the page did not receive the password, the webmaster shows **Needs a password**. Select **Issue password** on that row.
+If the password was not issued, the row shows **Needs a password**. Select **Issue password** on that row. If the password was issued but the page did not receive it, a line asks you to reset it. Use the key button on that row.
 
 To reset the password of another webmaster, select the key button on that row, then **Reset password**. The old password stops working, and every open session of that webmaster ends. You cannot reset your own password here.
 

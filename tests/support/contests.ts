@@ -84,6 +84,29 @@ export async function confirmExtraTime(local: LocalWorker, contestId: string, ex
 }
 
 /**
+ * Adds a contest that starts `start` minutes from now and ends `end` minutes
+ * from now, with a grace period, and seats the contestant in it.
+ */
+export async function addContestAt(local: LocalWorker, name: string, start: number, end: number, grace = 0) {
+  const id = randomUUID();
+  await local.run(
+    `INSERT INTO sessions (id, event_id, name, intake_open, starts_at, ends_at, grace_minutes, intake_follows_schedule)
+     VALUES (?, ?, ?, 1, ${minutes(start)}, ${minutes(end)}, ?, 1)`,
+    id,
+    local.event,
+    name,
+    grace,
+  );
+  await local.run(
+    "INSERT INTO teams (id, session_id, name, location, entrant_id) VALUES (?, ?, 'Aurora', 'A12', ?)",
+    randomUUID(),
+    id,
+    local.teams[0],
+  );
+  return id;
+}
+
+/**
  * Adds a contest that starts in 2032, after every contest that `seatThreeContests`
  * makes, and seats the contestant in it. It has not started, so its intake is
  * closed, and it ends later than any other contest.

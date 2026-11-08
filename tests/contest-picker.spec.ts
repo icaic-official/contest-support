@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { contrastOf } from "./support/contrast";
-import { addLaterContest, confirmExtraTime, endRunningContest, seatThreeContests } from "./support/contests";
+import { addContestAt, addLaterContest, confirmExtraTime, endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
 
 // The contestant sees three contests. One starts in 2031, one ended in 2020,
@@ -671,6 +671,25 @@ test.describe("the rows of the picker", () => {
     const weight = (item: Locator, line: RegExp) =>
       item.getByText(line).evaluate((element) => Number(getComputedStyle(element).fontWeight));
     expect(await weight(items.nth(1), /· Running now$/)).toBeGreaterThan(await weight(items.nth(0), /· Ended$/));
+  });
+
+  test("set the second line heavier only for the contest that runs, not for a grace period or a staff hold", async ({ page, local }) => {
+    const ids = await three(local);
+    // Delta is held open by staff. Bravo ended 5 minutes ago and is in its grace period.
+    await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.ended);
+    await addContestAt(local, "Bravo", -35, -5, 30);
+    await signIn(page);
+    await trigger(page).click();
+    const menu = page.getByRole("menu");
+    await expect(menu.getByRole("menuitemradio")).toHaveCount(4);
+    const weight = (name: RegExp, line: RegExp) =>
+      menu
+        .getByRole("menuitemradio", { name })
+        .getByText(line)
+        .evaluate((element) => Number(getComputedStyle(element).fontWeight));
+    const running = await weight(/^Charlie/, /· Running now$/);
+    expect(running).toBeGreaterThan(await weight(/^Bravo/, /· Intake open \(grace period\)$/));
+    expect(running).toBeGreaterThan(await weight(/^Delta/, /· Intake open \(set by staff\)$/));
   });
 
   test("say Running now only for the contest that runs", async ({ page, local }) => {

@@ -22,6 +22,7 @@ import { SignIn } from "@/screens/SignIn";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { searchWithoutContest } from "./navigation";
+import { setTabSignedOut, startVisit, tabSignedOut } from "./tabSignOut";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
 
@@ -76,20 +77,29 @@ export function ConnectedApp() {
   // sign-out to the next sign-in, no address that this tab shows keeps it, so
   // the next person starts from the default contest. That covers the entries
   // that the browser returns to after the sign-out: a phone screen above the
-  // home goes back one entry when it unmounts, and Back reaches the rest. A
-  // visit that was never signed in keeps the contest of a shared link.
-  const tab = useRef<"new" | "signed-in" | "signed-out">("new");
+  // home goes back one entry when it unmounts, and Back reaches the rest, also
+  // after a reload. A link that the person opens is a new visit, and keeps its
+  // contest, also in a tab that signed out.
+  useEffect(startVisit, []);
+  const wasSignedIn = useRef(false);
   useEffect(() => {
+    if (auth.loading) return;
     if (user) {
-      tab.current = "signed-in";
+      if (!wasSignedIn.current) {
+        wasSignedIn.current = true;
+        setTabSignedOut(false);
+      }
       return;
     }
-    if (tab.current === "signed-in") tab.current = "signed-out";
-    if (tab.current !== "signed-out") return;
+    if (wasSignedIn.current) {
+      wasSignedIn.current = false;
+      setTabSignedOut(true);
+    }
+    if (!tabSignedOut()) return;
     const cleared = searchWithoutContest(search);
     if (cleared === search) return;
     void navigate({ pathname, search: cleared, hash }, { replace: true, state: routerState });
-  }, [user, navigate, pathname, search, hash, routerState]);
+  }, [auth.loading, user, navigate, pathname, search, hash, routerState]);
   const [live, setLive] = useState(false);
   const account = useAccountStatus(user?.id, live);
   const [passwordSetup, setPasswordSetup] = useState(false);

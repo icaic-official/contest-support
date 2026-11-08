@@ -485,10 +485,22 @@ test.describe("a tab that signed out", () => {
 
   const withoutContest = (page: Page) => expect(page).toHaveURL((url) => !url.searchParams.has("contest"));
 
-  const nextPersonGetsTheDefault = async (page: Page, running: string) => {
-    await signInHere(page);
-    await expect(triggerFor(page, "Charlie")).toBeVisible();
-    await at(page, "/issues", running);
+  const signInHeading = (page: Page) => page.getByRole("heading", { name: "Sign in", exact: true });
+
+  // The jury member is seated in every contest, Delta included, so only the rule can keep them out of Delta.
+  const nextPersonGetsTheDefault = async (page: Page, running: string, { username = "jury", path = "/issues" } = {}) => {
+    await signInHere(page, username);
+    await expect(page.getByText("Live", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await at(page, path, running);
+  };
+
+  const chooseDeltaThenMyAccount = async (page: Page, ids: { ended: string }) => {
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "My account" }).click();
+    await at(page, "/account", ids.ended);
   };
 
   test("shows no contest after Back, and the next sign-in opens the default", async ({ page, local }) => {
@@ -527,8 +539,9 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
-  // Some browsers deny page storage, for example with every cookie blocked. The page must still clear.
-  test("shows no contest after a sign-out when the browser denies page storage, and the next sign-in opens the default", async ({ page, local }) => {
+  // Some browsers deny page storage, for example with every cookie blocked. A reload then ends
+  // everything that the page kept in memory, and Back loads the older entry as a page load.
+  test("opens the default for the next person after a sign-out, a reload and Back when the browser denies page storage", async ({ page, local }) => {
     await page.addInitScript(() => {
       Object.defineProperty(window, "sessionStorage", {
         get() {
@@ -537,13 +550,94 @@ test.describe("a tab that signed out", () => {
       });
     });
     const ids = await three(local);
+    await chooseDeltaThenMyAccount(page, ids);
+    await signOut(page);
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await page.goBack();
+    await expect(signInHeading(page)).toBeVisible();
+    await expect(page).toHaveURL((url) => url.pathname === "/issues");
+    await nextPersonGetsTheDefault(page, ids.running);
+  });
+
+  // A session can end while the tab waits: it expires, an organizer resets the password, or
+  // another tab signs out. The next page load shows the sign-in page on the address of the person before.
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test(`opens the default for the next person after a page load finds that the session ended, at ${viewport.width} px`, async ({ page, local }) => {
+      await page.setViewportSize(viewport);
+      const ids = await three(local);
+      await signIn(page);
+      await choose(page, "Delta");
+      await at(page, "/issues", ids.ended);
+      await page.context().clearCookies();
+      await page.reload();
+      await expect(signInHeading(page)).toBeVisible();
+      await at(page, "/issues", ids.ended);
+      await nextPersonGetsTheDefault(page, ids.running);
+    });
+  }
+
+  test("opens the person's own contest again after a page load finds that the session ended", async ({ page, local }) => {
+    const ids = await three(local);
     await signIn(page);
     await choose(page, "Delta");
     await at(page, "/issues", ids.ended);
+    await page.context().clearCookies();
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await signInHere(page);
+    await expect(triggerFor(page, "Delta")).toBeVisible();
+    await at(page, "/issues", ids.ended);
+  });
+
+  test("keeps the person's own contest when the session restore fails and they sign in again", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.route("**/api/auth/session*", (route) => route.fulfill({ status: 500, json: { error: "Unavailable." } }));
+    await page.reload();
+    await expect(page.getByRole("alert").filter({ hasText: "Unavailable." })).toBeVisible();
+    await expect(signInHeading(page)).toBeVisible();
+    await page.unroute("**/api/auth/session*");
+    await signInHere(page);
+    await expect(triggerFor(page, "Delta")).toBeVisible();
+    await at(page, "/issues", ids.ended);
+  });
+
+  // The next person signs in, and a page load follows. A jump of two entries, or the long-press
+  // menu of Back, then loads an entry of the person before as a page load, with the next person signed in.
+  test("opens the default when a page load goes back to an address of the person before", async ({ page, local }) => {
+    const ids = await three(local);
+    await chooseDeltaThenMyAccount(page, ids);
     await signOut(page);
-    await settle(page);
-    await withoutContest(page);
-    await nextPersonGetsTheDefault(page, ids.running);
+    await signInHere(page, "jury");
+    await at(page, "/account", ids.running);
+    await page.goto("/issues");
+    await at(page, "/issues", ids.running);
+    const landed = page.waitForURL((url) => url.pathname === "/issues" && url.searchParams.get("contest") === ids.ended);
+    await page.evaluate(() => window.history.go(-2));
+    await landed;
+    await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+    await at(page, "/issues", ids.running);
+  });
+
+  // Another tab signs out and signs in a different account. This tab learns of the new account at its next session check.
+  test("opens the default when another tab changes the account", async ({ page, local, context }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    const other = await context.newPage();
+    await other.goto("/issues");
+    await expect(other.getByText("Live", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await signOut(other);
+    await signInHere(other, "jury");
+    await expect(other.getByText("Live", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await page.bringToFront();
+    await focusEvent(page);
+    await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+    await at(page, "/issues", ids.running);
   });
 
   // Only a sign-in ends the state of the tab. A page load that the person starts adds an entry, and
@@ -568,15 +662,15 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
-  test("ignores the contest of a link that the person opens in a tab that signed out", async ({ page, local }) => {
+  test("opens the contest of a link that the next person opens in a tab that signed out", async ({ page, local }) => {
     const ids = await three(local);
     await signIn(page);
     await signOut(page);
     await page.goto(`/issues?contest=${ids.ended}`);
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-    await settle(page);
-    await withoutContest(page);
-    await nextPersonGetsTheDefault(page, ids.running);
+    await expect(signInHeading(page)).toBeVisible();
+    await signInHere(page, "jury");
+    await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+    await at(page, "/issues", ids.ended);
   });
 
   // Another tab can sign in after this tab signed out, and the cookie then gives this tab a session.
@@ -623,6 +717,21 @@ test.describe("a tab that signed out", () => {
       await settle(page);
       await withoutContest(page);
       await nextPersonGetsTheDefault(page, ids.running);
+    });
+
+    // The phone password form of staff unmounts the screens, so nothing on the page can rewrite its entry later.
+    test("opens the default for the next person after a staff member signs out from the phone password form", async ({ page, local }) => {
+      const ids = await three(local);
+      await signIn(page, "jury");
+      await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: "Me", exact: true }).click();
+      await page.getByRole("group", { name: "Choose a contest session" }).getByRole("radio", { name: /^Delta/ }).check();
+      await at(page, "/account", ids.ended);
+      await page.getByRole("button", { name: "Change password" }).click();
+      await expect(page.getByLabel("Current password", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      await expect(signInHeading(page)).toBeVisible();
+      await expect(page).toHaveURL((url) => url.pathname === "/account");
+      await nextPersonGetsTheDefault(page, ids.running, { username: "contestant", path: "/account" });
     });
 
     test("shows no contest after a sign-out that follows a sent report, and the next sign-in opens the default", async ({ page, local }) => {

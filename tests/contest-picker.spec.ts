@@ -457,10 +457,51 @@ test.describe("the next person on a tab", () => {
   const signInHeading = (page: Page) => page.getByRole("heading", { name: "Sign in", exact: true });
 
   // The jury member is seated in every contest, Delta included, so only the rule can keep them out of Delta.
-  const nextPersonGetsTheDefault = async (page: Page, running: string, { username = "jury", path = "/issues" } = {}) => {
+  const nextPersonGetsTheDefault = async (page: Page, running: string, { username = "jury", path = "/issues", hash = "" } = {}) => {
     await signInHere(page, username);
     await expect(page.getByText("Live", { exact: true })).toBeVisible({ timeout: 15_000 });
-    await at(page, path, running);
+    await at(page, path, running, hash);
+  };
+
+  const skipToMain = async (page: Page) => {
+    await page.getByRole("link", { name: "Skip to main content" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#main")).toBeFocused();
+  };
+
+  /**
+   * The jury member chooses Delta and the session ends. The contestant, who now
+   * has only Alpha, signs in on that entry, and the address keeps Delta. The
+   * combined staff member joins Delta and Charlie, so only the rule keeps them
+   * out of Delta, and Charlie stays their default.
+   */
+  const oneContestOnTheChoiceBefore = async (page: Page, local: LocalWorker) => {
+    const ids = await three(local);
+    await local.run(
+      "DELETE FROM teams WHERE entrant_id = ? AND session_id IN (?, ?)",
+      local.teams[0],
+      ids.ended,
+      ids.running,
+    );
+    for (const contest of [ids.ended, ids.running]) {
+      await local.run("INSERT INTO memberships (session_id, account_id) VALUES (?, ?)", contest, local.users.combined);
+      await local.run(
+        "INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')",
+        contest,
+        local.users.combined,
+      );
+    }
+    await signIn(page, "jury");
+    await choose(page, "Delta");
+    await at(page, "/issues", ids.ended);
+    await page.context().clearCookies();
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await signInHere(page);
+    await expect(page.locator('[data-ui="contestant"]')).toBeVisible({ timeout: 15_000 });
+    await expect(trigger(page)).toHaveCount(0);
+    await at(page, "/issues", ids.ended);
+    return ids;
   };
 
   const chooseDeltaThenMyAccount = async (page: Page, ids: { ended: string }) => {
@@ -616,6 +657,89 @@ test.describe("the next person on a tab", () => {
     await focusEvent(page);
     await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
     await at(page, "/issues", ids.running);
+  });
+
+  // The skip link writes `#main` without the router. That entry must still name the account that chose Delta.
+  test("opens the default for the next person after the skip link, a sign-out and a reload", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await skipToMain(page);
+    await at(page, "/issues", ids.ended, "#main");
+    await signOut(page);
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/issues", ids.ended, "#main");
+    await nextPersonGetsTheDefault(page, ids.running, { hash: "#main" });
+  });
+
+  test("opens the default for the next person after the skip link, My account, a sign-out and Back", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await skipToMain(page);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "My account" }).click();
+    await at(page, "/account", ids.ended);
+    await signOut(page);
+    await page.goBack();
+    await settle(page);
+    await at(page, "/issues", ids.ended, "#main");
+    await nextPersonGetsTheDefault(page, ids.running, { hash: "#main" });
+  });
+
+  test("opens the default for the next person after the skip link and a page load that finds the session ended, at 390 px", async ({ page, local }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const ids = await three(local);
+    await signIn(page);
+    await choose(page, "Delta");
+    await skipToMain(page);
+    await at(page, "/issues", ids.ended, "#main");
+    await page.context().clearCookies();
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/issues", ids.ended, "#main");
+    await nextPersonGetsTheDefault(page, ids.running, { hash: "#main" });
+  });
+
+  // A person with one contest gets no write from the hook, so each new entry must carry the owner that the entry before named.
+  test("opens the default for the next person after a person with one contest opens My account on the choice before", async ({ page, local }) => {
+    const ids = await oneContestOnTheChoiceBefore(page, local);
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await page.getByRole("menuitem", { name: "My account" }).click();
+    await at(page, "/account", ids.ended);
+    await signOut(page);
+    await at(page, "/account", ids.ended);
+    await nextPersonGetsTheDefault(page, ids.running, { username: "combined", path: "/account" });
+  });
+
+  test("opens the default for the next person after a person with one contest skips to the report details on the choice before", async ({ page, local }) => {
+    const ids = await oneContestOnTheChoiceBefore(page, local);
+    await page.getByRole("link", { name: "Skip to report details" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#contestant-main")).toBeFocused();
+    await at(page, "/issues", ids.ended, "#contestant-main");
+    await signOut(page);
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/issues", ids.ended, "#contestant-main");
+    await nextPersonGetsTheDefault(page, ids.running, { username: "combined", hash: "#contestant-main" });
+  });
+
+  // The report form takes a history entry. A page load leaves the tab on that entry, because no unmount goes back.
+  test("opens the default for the next person after a person with one contest opens the report form on the choice before, at 390 px", async ({ page, local }) => {
+    const ids = await oneContestOnTheChoiceBefore(page, local);
+    await local.run("UPDATE sessions SET intake_follows_schedule = 0, intake_open = 1 WHERE id = ?", ids.next);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await focusEvent(page);
+    await page.getByRole("button", { name: "Report an issue" }).click();
+    await expect(page.getByLabel("What is happening?")).toBeVisible();
+    await at(page, "/issues", ids.ended);
+    await page.context().clearCookies();
+    await page.reload();
+    await expect(signInHeading(page)).toBeVisible();
+    await at(page, "/issues", ids.ended);
+    await nextPersonGetsTheDefault(page, ids.running, { username: "combined" });
   });
 
   // A link has no owner, so it keeps its contest for whoever signs in.

@@ -579,6 +579,18 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
+  // Another tab can sign in after this tab signed out, and the cookie then gives this tab a session.
+  // While the page restores that session, nobody is signed in yet. The page must not strip the contest then.
+  test("keeps the contest of a link when another tab has signed in since this tab signed out", async ({ page, local, context }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await signOut(page);
+    await signIn(await context.newPage());
+    await page.goto(`/issues?contest=${ids.ended}`);
+    await expect(triggerFor(page, "Delta")).toBeVisible();
+    await at(page, "/issues", ids.ended);
+  });
+
   test.describe("on a phone", () => {
     test.use({ viewport: { width: 390, height: 844 } });
 

@@ -137,7 +137,11 @@ export interface ContestSummary {
   contestType: ContestType;
   /** Null for a contest created before schedules existed. */
   schedule: Schedule | null;
-  /** The contest-wide state. A contestant's own state can last longer by confirmed extra time. */
+  /**
+   * The caller's own state. A contestant's confirmed extra time keeps a contest open past its
+   * scheduled end, as the contest's own clock says. A read for an event or a window gives the
+   * state of the contest alone.
+   */
   intake: IntakeState;
   canOpen: boolean;
   manage: ManageLevel;

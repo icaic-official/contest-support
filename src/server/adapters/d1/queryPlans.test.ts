@@ -37,6 +37,9 @@ const queries: Record<string, string> = {
 const materializedScans = new Map([
   [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c|x)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
+  // The list materializes the caller's contests with their extra minutes as `viewer`, and reads it as `v`.
+  // It must not allow `c`: `extraMinutesSql` reads `contest_awards` as `c`, so a scan of that table would pass.
+  [contestsListSql, /^SCAN v$/],
   // The webmaster row holds the account's site grant, if it has one. It is one row, and it gates the site branch.
   [calendarSql, /^SCAN webmaster$/],
   // The site page lists every event, and the site has few.

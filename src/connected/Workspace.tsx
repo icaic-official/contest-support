@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from "react-router";
 import { BuildId } from "@/components/build-id";
 import { RenderErrorBoundary } from "@/components/render-error-boundary";
 import { Button } from "@/components/ui/button";
+import { NoLevelAccess } from "@/screens/NoLevelAccess";
 import { NoSessionAccess } from "@/screens/NoSessionAccess";
 import { Announcements } from "./Announcements";
 import { AvatarProvider } from "./Avatars";
@@ -10,7 +11,15 @@ import { useCommand } from "./hooks/useCommand";
 import { useSessionSnapshot } from "./hooks/useSessionSnapshot";
 import { type UiKind, uiKindFor } from "./model";
 import type { ShellProps } from "./shell";
-import { canOpenPage, eventPath, eventRouteOf, isEntryPath, pageForPath, sitePath } from "./navigation";
+import {
+  canOpenPage,
+  eventPath,
+  eventRouteOf,
+  isEntryPath,
+  levelScreenAccess,
+  pageForPath,
+  sitePath,
+} from "./navigation";
 import { useNoContestLanding } from "@/event/useOwnEvent";
 import {
   ContestantApp,
@@ -55,6 +64,14 @@ export function Workspace({
   const noContest = data.loaded && !data.snapshot && data.sessions.length === 0 && !data.refreshError;
   const landing = useNoContestLanding(noContest);
   const eventRoute = eventRouteOf(pathname);
+  const onSitePage = pathname.replace(/\/+$/u, "") === sitePath;
+  // Both screens are staff code. A person with neither level never downloads them.
+  if (eventRoute || onSitePage) {
+    const access = levelScreenAccess(data.sessions, data.loaded);
+    // The wait for the first session, which has Sign out, because a read can hang.
+    if (access === "wait") return <SessionAccess {...props} data={data} />;
+    if (access === "deny") return <NoLevelAccess page={onSitePage ? "site" : "event"} signOut={props.signOut} />;
+  }
   if (eventRoute) {
     return (
       <WithScreen>
@@ -69,12 +86,12 @@ export function Workspace({
     );
   }
   if (noContest && landing === "event") return <Navigate to={eventPath()} replace />;
-  if (noContest && landing === "site" && pathname.replace(/\/+$/u, "") !== sitePath) {
+  if (noContest && landing === "site" && !onSitePage) {
     return <Navigate to={sitePath} replace />;
   }
   // The site page needs no readable contest, so a webmaster who must join
   // first can still reach the setting that asks for the join.
-  if (pathname.replace(/\/+$/u, "") === sitePath) {
+  if (onSitePage) {
     return (
       <WithScreen>
         <SiteDashboard user={props.user} data={data} signOut={props.signOut} />

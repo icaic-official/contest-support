@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { snapshotSchema } from "../src/connected/model";
 import { appErrors } from "./support/worker";
+import { atPath } from "./support/address";
 import { expect, test } from "./support/localWorker";
 
 // T0009 jury worklist checks for the T0015 organiser UIs. The phone Awards
@@ -58,7 +59,7 @@ async function openAwards(page: Page) {
       page.getByRole("heading", { level: 1, name: "Award review" }),
     ).toBeFocused();
   }
-  await expect(page).toHaveURL("/jury");
+  await expect(page).toHaveURL(atPath("/jury"));
 }
 
 /** The button of an award list, whose text ends with its count. */
@@ -716,7 +717,7 @@ test("session and role changes clear selection and do not grant other roles a ju
   // The award form closes because the person can no longer decide awards.
   await expect(sheet(page, "Decide award")).toHaveCount(0);
   await expect(page.getByLabel("Public award explanation")).toHaveCount(0);
-  await expect(page).toHaveURL("/issues");
+  await expect(page).toHaveURL(atPath("/issues"));
   await expect(
     page.getByRole("heading", { level: 1, name: "Queue", exact: true }),
   ).toBeFocused();

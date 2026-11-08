@@ -20,23 +20,22 @@ export const SiteDashboard = lazy(() =>
   import("@/site/SiteDashboard").then((m) => ({ default: m.SiteDashboard })),
 );
 
+/** A short wait for a screen whose code is not ready. */
+function ScreenWait() {
+  return (
+    <p
+      role="status"
+      className="flex items-center justify-center gap-2 p-6 text-muted-foreground"
+    >
+      <Spinner className="size-4" />
+      Loading…
+    </p>
+  );
+}
+
 /** Shows a short wait while a screen's code downloads. */
 export function WithScreen({ children }: { children: ReactNode }) {
-  return (
-    <Suspense
-      fallback={
-        <p
-          role="status"
-          className="flex items-center justify-center gap-2 p-6 text-muted-foreground"
-        >
-          <Spinner className="size-4" />
-          Loading…
-        </p>
-      }
-    >
-      {children}
-    </Suspense>
-  );
+  return <Suspense fallback={<ScreenWait />}>{children}</Suspense>;
 }
 
 const screenKey = "minsky-screen";

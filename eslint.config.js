@@ -12,6 +12,8 @@ const providerImportPattern = [
   String.raw`^(?:\.\.?/)+(?:cloudflare|aws|gcp|azure)(?:/|$)`,
 ].join("|");
 const providerImportMessage = "Keep provider SDKs and implementations inside provider modules. Use the shared contracts.";
+// An entry without the owner of its `?contest=` reads as a link from outside the app, so the next person on the tab opens that contest.
+const contestOwnerMessage = "A new history entry that keeps ?contest= must keep its owner. Use keepContest() or skipToFragment() from src/connected/navigation.ts.";
 
 export default tseslint.config(
   { ignores: ["dist", ".claude", "design", "node_modules", "playwright-report", "test-results", "site/dist", "site/.astro", "site/node_modules", "**/.wrangler/**"] },
@@ -72,9 +74,17 @@ export default tseslint.config(
       }, {
         selector: "ImportExpression[source.type!='Literal']",
         message: "Use a literal dynamic import path so the provider boundary can be checked.",
+      }, {
+        selector: "ObjectExpression > Property[key.name='search']",
+        message: contestOwnerMessage,
+      }, {
+        selector: "JSXOpeningElement:not(:has(JSXAttribute[name.name='onClick'] Identifier[name='skipToFragment'])) > JSXAttribute[name.name='href']:matches([value.value=/^#/], :has(TemplateElement[value.raw=/^#/]))",
+        message: contestOwnerMessage,
       }],
+      "no-restricted-properties": ["error", { property: "pushState", message: contestOwnerMessage }, { property: "replaceState", message: contestOwnerMessage }],
     },
   },
+  { files: ["src/connected/navigation.ts"], rules: { "no-restricted-properties": "off" } },
   {
     files: ["src/server/**/*.ts"],
     ignores: ["src/server/adapters/**"],

@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { BrandMark } from "@/components/brand";
 import { BuildId } from "@/components/build-id";
@@ -21,34 +21,9 @@ import { PasswordForm } from "@/screens/PasswordForm";
 import { SignIn } from "@/screens/SignIn";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { keepContest, skipToFragment } from "./navigation";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
-
-/**
- * Moves keyboard focus to the main landmark.
- *
- * A native link to `#main` fires popstate. The hosted staff check then
- * focused the page heading, so `#main` stayed inactive. Record the fragment
- * without that event.
- */
-function skipToMain(event: MouseEvent<HTMLAnchorElement>): void {
-  if (
-    event.button !== 0 ||
-    event.metaKey ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.shiftKey
-  ) {
-    return;
-  }
-  const main = document.getElementById("main");
-  if (!(main instanceof HTMLElement)) return;
-  event.preventDefault();
-  main.focus();
-  if (window.location.hash !== "#main") {
-    window.history.pushState(null, "", "#main");
-  }
-}
 
 /** The page chrome around the main landmark. */
 type Layout = "dashboard" | "centered" | "landing";
@@ -66,7 +41,8 @@ const mainClasses: Record<Layout, string> = {
  */
 export function ConnectedApp() {
   const navigate = useNavigate();
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search } = location;
   const auth = useAuthSession();
   const { user } = auth;
   const [live, setLive] = useState(false);
@@ -147,7 +123,9 @@ export function ConnectedApp() {
         canChangeUsername={status.can_change_handle}
         refreshAccount={account.refresh}
         changePassword={() => {
-          navigate("/account");
+          // This unmounts the workspace. Its hook reads the contest from the address when it mounts again.
+          const entry = keepContest(location, "/account");
+          navigate(entry.to, { state: entry.state });
           setPasswordSetup(true);
         }}
         signOut={auth.signOut}
@@ -161,7 +139,7 @@ export function ConnectedApp() {
         <a
           href="#main"
           className="sr-only z-50 rounded-md bg-background text-sm font-medium shadow-md focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:px-4 focus:py-3"
-          onClick={skipToMain}
+          onClick={skipToFragment}
         >
           Skip to main content
         </a>

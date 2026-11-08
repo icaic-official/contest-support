@@ -92,6 +92,7 @@ npm run test:connector:ui:local
 
 This command builds a separate Cloudflare frontend without replacing the default `dist` output.
 It uses the same UI assertions as the guarded hosted journey, with separate local fixture setup.
+After the journey, the local run also checks the redirects of a person with several contests, because only a production build shows their race with the contest address effect. The hosted journey does not run that step.
 It accepts no targets or filters and deletes its temporary build, bindings, and browser artifacts afterward.
 Local emulation does not replace the required hosted Cloudflare evidence.
 

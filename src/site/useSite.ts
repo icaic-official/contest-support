@@ -9,6 +9,7 @@ import type {
 import { errorMessage } from "@/backend/errors";
 import { keepFocus, useRefreshOnReturn } from "@/connected/hooks/useRefreshOnReturn";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
+import { levelRefusals } from "@/screens/NoLevelAccess";
 
 const DELETION_REFRESH_MS = 15_000;
 
@@ -52,7 +53,7 @@ export function useSite(): SiteState {
     try {
       const next = await backend.manage.site();
       setSite(next ?? undefined);
-      setReadError(next ? "" : "Only a webmaster can open the site page.");
+      setReadError(next ? "" : levelRefusals.site.message);
     } catch (cause) {
       setReadError(errorMessage(cause));
     }

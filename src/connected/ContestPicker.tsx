@@ -1,4 +1,4 @@
-import { type ReactElement, useId } from "react";
+import { type ReactElement, useId, useMemo } from "react";
 import type { ContestSummary } from "@/backend/contracts";
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { type ContestRow, contestRows, rowDetail, rowText } from "./contestList";
 
 interface PickerProps {
   contests: readonly ContestSummary[];
@@ -19,18 +20,39 @@ interface PickerProps {
   disabled?: boolean | undefined;
 }
 
-/** A contest's name, with its event when another listed contest has the same name. */
-export function contestLabel(contests: readonly ContestSummary[], contest: ContestSummary): string {
-  const shared = contests.some((other) => other.id !== contest.id && other.name === contest.name);
-  return shared ? `${contest.name} · ${contest.eventName}` : contest.name;
+/**
+ * A row's name on the first line, and its start time and intake note on the
+ * second. The note is text, so a screen reader reads it too. The name breaks
+ * anywhere, because a long name must not widen a narrow phone screen. The
+ * second line takes the text color of a focused menu row, because the muted
+ * color falls below 4.5:1 on that row's background.
+ */
+function RowLines({ row }: { row: ContestRow }) {
+  const detail = rowDetail(row);
+  return (
+    <span className="flex min-w-0 flex-1 flex-col text-left [overflow-wrap:anywhere]">
+      <span>{row.name}</span>
+      {detail !== null && (
+        <span
+          className={cn(
+            "text-xs in-data-highlighted:text-accent-foreground",
+            row.running ? "font-medium text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {detail}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
  * The one picker for the contests that a person may open, in three shapes:
  * a menu behind a trigger button, radio rows for a phone, and a select for the
  * no-access screen. It lists the contests of `data.sessions`, which come from
- * `/api/contests`. A person with one contest sees no picker; the caller shows
- * the name instead.
+ * `/api/contests`, in the order that the hook gives. Each row shows the name,
+ * the start time in the event's zone and what the intake does now. A person
+ * with one contest sees no picker; the caller shows the name instead.
  */
 export function ContestPicker(
   props: PickerProps &
@@ -46,15 +68,23 @@ export function ContestPicker(
       | { variant: "select"; label: string }
     ),
 ) {
-  const { contests, value, onSelect, disabled } = props;
+  const { value, onSelect, disabled } = props;
   const id = useId();
+  // The parent renders every second for the clocks. The rows change only with the contests.
+  const rows = useMemo(() => contestRows(props.contests), [props.contests]);
   if (props.variant === "menu") {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={disabled}>
           {props.trigger}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align={props.align ?? "start"} className={props.className}>
+        <DropdownMenuContent
+          align={props.align ?? "start"}
+          className={cn(
+            "max-w-[min(24rem,var(--radix-dropdown-menu-content-available-width))]",
+            props.className,
+          )}
+        >
           <DropdownMenuLabel>Contest session</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={value}
@@ -62,9 +92,9 @@ export function ContestPicker(
               if (next !== value) onSelect(next);
             }}
           >
-            {contests.map((item) => (
-              <DropdownMenuRadioItem key={item.id} value={item.id}>
-                {contestLabel(contests, item)}
+            {rows.map((row) => (
+              <DropdownMenuRadioItem key={row.id} value={row.id}>
+                <RowLines row={row} />
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
@@ -76,22 +106,20 @@ export function ContestPicker(
     return (
       <fieldset disabled={disabled} className="divide-y rounded-xl border bg-card">
         <legend className="sr-only">{props.legend}</legend>
-        {contests.map((item) => (
+        {rows.map((row) => (
           <label
-            key={item.id}
-            className={cn(
-              "flex min-h-12 cursor-pointer items-center gap-3 px-4 text-[15px]",
-            )}
+            key={row.id}
+            className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-2 text-[15px]"
           >
             <input
               type="radio"
               name={`${id}-contests`}
-              value={item.id}
-              checked={item.id === value}
-              onChange={() => onSelect(item.id)}
-              className="size-4 accent-current"
+              value={row.id}
+              checked={row.id === value}
+              onChange={() => onSelect(row.id)}
+              className="size-4 shrink-0 accent-current"
             />
-            <span className="flex-1">{contestLabel(contests, item)}</span>
+            <RowLines row={row} />
           </label>
         ))}
       </fieldset>
@@ -105,11 +133,11 @@ export function ContestPicker(
         value={value}
         disabled={disabled}
         onChange={(event) => onSelect(event.target.value)}
-        className="h-11 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+        className="h-11 w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
       >
-        {contests.map((item) => (
-          <option key={item.id} value={item.id}>
-            {contestLabel(contests, item)}
+        {rows.map((row) => (
+          <option key={row.id} value={row.id}>
+            {rowText(row)}
           </option>
         ))}
       </select>

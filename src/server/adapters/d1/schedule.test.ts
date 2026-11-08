@@ -138,8 +138,63 @@ describe('contest schedule, clock, time awards, and intake', () => {
     expect(await clockOf(fixture.contestant)).toMatchObject({ open: false, clock: { intake: { reason: 'ended' } } });
   });
 
+  describe('the contest list', () => {
+    const viewers = () => [fixture.contestant, fixture.otherContestant, fixture.staff];
+
+    /** The contest's intake in the list that `caller` reads, and in the caller's own clock. */
+    async function intakes(caller: Caller) {
+      const listed = (await application.contests(caller)).find((contest) => contest.id === fixture.sessionId)!.intake;
+      const { intake } = (await clockOf(caller)).clock;
+      return { listed, own: { open: intake.open, reason: intake.reason, changesAt: intake.changes_at } };
+    }
+
+    it('says what the clock of each viewer says, before the start, while running, and after the end', async () => {
+      for (const [start, end, grace] of [[30, 90, 15], [-60, 30, 15], [-60, -5, 10], [-90, -30, 15]] as const) {
+        await follow(start, end, grace);
+        for (const viewer of viewers()) {
+          const { listed, own } = await intakes(viewer);
+          expect(listed, `${start}, ${end}, ${grace}`).toEqual(own);
+        }
+      }
+    });
+
+    it('keeps a contest open for the contestant whose confirmed extra time runs on, and for no one else', async () => {
+      await follow(-60, -5);
+      await award(20, false);
+      expect((await intakes(fixture.contestant)).listed).toMatchObject({ open: false, reason: 'ended' });
+      await run('DELETE FROM resolutions WHERE session_id = ?', fixture.sessionId);
+      await award(20, true);
+      const { listed, own } = await intakes(fixture.contestant);
+      expect(listed).toMatchObject({ open: true, reason: 'running' });
+      expect(listed).toEqual(own);
+      for (const viewer of [fixture.otherContestant, fixture.staff]) {
+        expect((await intakes(viewer)).listed, 'a viewer without extra time').toMatchObject({ open: false, reason: 'ended' });
+      }
+    });
+
+    it('lets the grace period start after the extra time', async () => {
+      await follow(-60, -25, 10);
+      await award(20, true);
+      expect((await intakes(fixture.contestant)).listed).toMatchObject({ open: true, reason: 'grace' });
+      await run('UPDATE awards SET minutes = 10 WHERE session_id = ?', fixture.sessionId);
+      expect((await intakes(fixture.contestant)).listed).toMatchObject({ open: false, reason: 'ended' });
+    });
+  });
+
   describe('contest-wide awards', () => {
     const grant = { type: 'grant', minutes: 15, explanation: 'Network outage in the hall.' } as const;
+
+    it('keeps the contest open in the list of every contestant, and not of the staff', async () => {
+      await follow(-60, -5);
+      const id = await awards.execute(fixture.staff, fixture.sessionId, randomUUID(), grant);
+      await awards.execute(fixture.specialist, fixture.sessionId, randomUUID(), { type: 'apply', awardId: id });
+      for (const contestant of [fixture.contestant, fixture.otherContestant]) {
+        const listed = (await application.contests(contestant)).find((contest) => contest.id === fixture.sessionId)!;
+        expect(listed.intake).toMatchObject({ open: true, reason: 'running' });
+      }
+      const staff = (await application.contests(fixture.staff)).find((contest) => contest.id === fixture.sessionId)!;
+      expect(staff.intake).toMatchObject({ open: false, reason: 'ended' });
+    });
 
     it('gives every contestant confirmed minutes, and shows contestants only the confirmed award', async () => {
       await follow(-60, -5);

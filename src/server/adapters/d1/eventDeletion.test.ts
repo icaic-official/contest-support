@@ -158,8 +158,16 @@ describe('event deletion', () => {
       const other = await seedWebmaster(db);
       const [site] = await rows<{ handle: string }>('SELECT handle FROM accounts WHERE id = ?', other.accountId);
       await setPassword(other.accountId);
-      const siteSigned = await auth().signIn({ kind: 'site' }, site!.handle as Handle, password);
-      expect((await auth().current(cookieHeaders(siteSigned.cookie)))?.user.id).toBe(other.accountId);
+      try {
+        const siteSigned = await auth().signIn({ kind: 'site' }, site!.handle as Handle, password);
+        expect((await auth().current(cookieHeaders(siteSigned.cookie)))?.user.id).toBe(other.accountId);
+      } finally {
+        // A hosted database keeps this site account, so it must not keep a password that this file shows.
+        await db.batch([
+          bound(db, `UPDATE ba_account SET password = 'fictional-test-hash' WHERE userId = ?`, other.accountId),
+          bound(db, 'UPDATE logins SET revoked = 1 WHERE account_id = ?', other.accountId),
+        ]);
+      }
       await cleanUp(doomed, kept);
     });
   });

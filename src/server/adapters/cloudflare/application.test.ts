@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { Caller } from '../../authentication';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { D1ApplicationService } from './application';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
@@ -24,9 +24,7 @@ describe('Cloudflare authorized application and administration', () => {
   }
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Connection }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);
@@ -98,8 +96,6 @@ describe('Cloudflare authorized application and administration', () => {
 
   afterEach(async () => {
     if (!created) return;
-    await db.batch([fixture.staff, fixture.specialist, fixture.contestant, fixture.otherContestant]
-      .map((caller) => statement('DELETE FROM ba_user WHERE id = ?', caller.accountId)));
     await fixture.cleanup();
   });
 

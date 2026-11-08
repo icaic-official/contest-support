@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { type MouseEvent, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
+import type { ContestSummary } from "@/backend/contracts";
 import { can, seatOf } from "./capabilities";
 import type { Membership } from "./model";
 
@@ -38,6 +39,83 @@ export function eventRouteOf(pathname: string): { eventId: string | undefined } 
   return match ? { eventId: match[1] } : undefined;
 }
 
+const contestParam = "contest";
+
+/** The contest that an address names with `?contest=`, or undefined when it names none. */
+export function contestOfSearch(search: string): string | undefined {
+  return new URLSearchParams(search).get(contestParam) || undefined;
+}
+
+/** The search text with `?contest=` set to this contest. Every other parameter stays. */
+export function searchWithContest(search: string, contestId: string): string {
+  const params = new URLSearchParams(search);
+  params.set(contestParam, contestId);
+  return `?${params}`;
+}
+
+const ownerField = "contestOwner";
+
+/**
+ * The account whose choice the `?contest=` of a history entry holds. It lives
+ * in the router state, which the browser keeps with the entry across a reload
+ * and Back. An address from outside the app, such as a shared link, has no
+ * owner.
+ */
+export function contestOwnerOf(state: unknown): string | undefined {
+  if (typeof state !== "object" || state === null) return undefined;
+  const owner: unknown = (state as Record<string, unknown>)[ownerField];
+  return typeof owner === "string" ? owner : undefined;
+}
+
+/** The router state with this owner. Every other field, such as a focus request, stays. An undefined owner leaves the state as it is. */
+export function withContestOwner(state: unknown, owner: string | undefined): unknown {
+  if (owner === undefined) return state;
+  return { ...(typeof state === "object" && state !== null ? state : {}), [ownerField]: owner };
+}
+
+/**
+ * A new history entry on `pathname` that keeps the search of `from`, with its
+ * `?contest=`, and the owner of that contest. `state` holds the other fields of
+ * the entry. Every in-app navigation that keeps `?contest=` builds its target
+ * here, and a lint rule in `eslint.config.js` sends other writers here. An
+ * entry with the contest and no owner reads as a link from outside the app, so
+ * the next person on the tab would open that contest.
+ */
+export function keepContest(
+  from: { search: string; state: unknown },
+  pathname: string,
+  state?: object,
+): { to: { pathname: string; search: string }; state: unknown } {
+  return {
+    // eslint-disable-next-line no-restricted-syntax -- This is the target that keeps the owner.
+    to: { pathname, search: from.search },
+    state: withContestOwner(state, contestOwnerOf(from.state)),
+  };
+}
+
+/**
+ * Moves keyboard focus to the target of a skip link, such as `#main`.
+ *
+ * A native link to a fragment fires popstate. The hosted staff check then
+ * focused the page heading, so the target did not keep focus. Its new entry
+ * also has no router state, so its `?contest=` would lose the owner. This
+ * writes the fragment without the event and keeps the owner.
+ */
+export function skipToFragment(event: MouseEvent<HTMLAnchorElement>): void {
+  if (event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+  const { hash } = event.currentTarget;
+  const target = document.getElementById(hash.slice(1));
+  if (!(target instanceof HTMLElement)) return;
+  event.preventDefault();
+  target.focus();
+  if (window.location.hash === hash) return;
+  // React Router keeps its own fields, such as the entry index, beside `usr`.
+  // Only the owner goes into the new `usr`. The phone report screen marks its
+  // entry in `usr`, and this entry is not that one.
+  const current = window.history.state as { usr?: unknown } | null;
+  window.history.pushState({ ...current, usr: withContestOwner(undefined, contestOwnerOf(current?.usr)) }, "", hash);
+}
+
 /** True for the signed-out entry addresses, which a signed-in person leaves for the queue. */
 export function isEntryPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/u, "");
@@ -70,22 +148,49 @@ export function canOpenPage(page: WorkspacePage, member: Membership): boolean {
   return true;
 }
 
+/**
+ * Whether the site page or an event console may open for this person, as far
+ * as the contest list tells. An event admin lists every contest of the event
+ * and a webmaster lists the contests that the site setting lets them read, each
+ * with the person's `manage` level. A list where no contest has the level
+ * `event` or `site` means that the person holds neither, so the page never
+ * downloads the staff screen. An empty list tells nothing: a webmaster who has
+ * joined no contest, or an event admin whose event has none, has one. The
+ * screen's own read decides then, and the server refuses everyone else.
+ *
+ * - `wait`: the first read of the list has not ended.
+ * - `deny`: the person has neither level.
+ * - `open`: show the screen.
+ *
+ * `read` says that a read has ended, and a non-empty list needs no more. On
+ * its first read the session hook publishes the list before it reads the snapshot,
+ * and it sends no snapshot read for an empty list. So the wait is never on a snapshot.
+ */
+export function levelScreenAccess(
+  contests: readonly Pick<ContestSummary, "manage">[],
+  read: boolean,
+): "wait" | "deny" | "open" {
+  if (contests.length === 0) return read ? "open" : "wait";
+  return contests.some(({ manage }) => manage === "event" || manage === "site") ? "open" : "deny";
+}
+
 /** Router state that asks the next page to focus one control. */
 interface FocusRequest {
   focusId: string;
+  /** Tells two requests for the same control apart. */
+  token: string;
 }
 
 /** The state to pass to `navigate` so that the page focuses the control with this ID. */
 export function focusRequest(focusId: string): FocusRequest {
-  return { focusId };
+  return { focusId, token: crypto.randomUUID() };
 }
 
-/** The control that the location asks the page to focus, if any. */
-export function requestedFocusId(state: unknown): string | undefined {
-  if (typeof state !== "object" || state === null || !("focusId" in state)) {
-    return undefined;
-  }
-  return typeof state.focusId === "string" ? state.focusId : undefined;
+/** The focus request that the location asks for, if any. */
+export function requestedFocus(state: unknown): FocusRequest | undefined {
+  if (typeof state !== "object" || state === null) return undefined;
+  const { focusId, token } = state as Partial<Record<keyof FocusRequest, unknown>>;
+  return typeof focusId === "string" && typeof token === "string" ? { focusId, token } : undefined;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useCallback, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
   Activity,
   Camera,
@@ -40,7 +40,8 @@ import { useAvatarEditor } from "./hooks/useAvatarEditor";
 import type { Membership, Snapshot } from "./model";
 import {
   focusRequest,
-  requestedFocusId,
+  keepContest,
+  requestedFocus,
   workspacePaths,
 } from "./navigation";
 import { PictureEditor } from "./PictureEditor";
@@ -77,22 +78,30 @@ export function useOpenPasswordChange(): () => void {
  * and scrolls it into view. A focus request in the location state picks one
  * control inside the section. The scroll container is not the window, so the
  * browser does not scroll on its own after a client-side navigation.
+ *
+ * The effect runs when the section or the request changes, and not for every
+ * new location. A write of `?contest=` to the address replaces the entry and
+ * keeps the hash and the state, so it must not take focus from a field.
+ * The request's token makes a second request for the same control run again.
  */
 function useSectionFocus(): void {
   const location = useLocation();
-  const { hash, key } = location;
+  const { hash } = location;
   const state: unknown = location.state;
+  const request = requestedFocus(state);
+  const requested = request?.focusId;
+  const token = request?.token;
   useEffect(() => {
     const id = hash.slice(1);
     if (!accountSections.some((section) => section.id === id)) return;
     const section = document.getElementById(id);
     if (!section) return;
-    const requested = requestedFocusId(state);
     const target =
       (requested && document.getElementById(requested)) || section;
     target.focus({ preventScroll: true });
     section.scrollIntoView({ block: "start" });
-  }, [hash, key, state]);
+    // `token` has no use in the effect. A new one asks for the focus again.
+  }, [hash, requested, token]);
 }
 
 /**
@@ -120,7 +129,8 @@ export function AccountPage({
   /** Clears the caller's selection after the session changes. */
   onSessionChange: () => void;
 }) {
-  const { hash } = useLocation();
+  const location = useLocation();
+  const { hash } = location;
   useSectionFocus();
   const kind = accountKind(state, member);
   const picture = useAvatarEditor();
@@ -221,10 +231,13 @@ export function AccountPage({
           <ul className="flex flex-wrap gap-1.5 @3xl:flex-col @3xl:gap-0.5">
             {accountSections.map(({ id, label }) => {
               const Icon = sectionIcons[id];
+              // The focus request lets a second click on the open section scroll to it again.
+              const entry = keepContest(location, location.pathname, focusRequest(id));
               return (
                 <li key={id}>
-                  <a
-                    href={`#${id}`}
+                  <Link
+                    to={{ ...entry.to, hash: `#${id}` }}
+                    state={entry.state}
                     aria-current={hash === `#${id}` ? "location" : undefined}
                     className={cn(
                       "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm text-muted-foreground outline-none max-lg:min-h-11 hover:bg-accent hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
@@ -233,7 +246,7 @@ export function AccountPage({
                   >
                     <Icon aria-hidden="true" className="size-4 shrink-0" />
                     {label}
-                  </a>
+                  </Link>
                 </li>
               );
             })}

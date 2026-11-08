@@ -1,11 +1,66 @@
 import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Browser, type Page } from '@playwright/test';
 import { createTestHarness } from 'wrangler';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
 import { applyMigrations } from '../../src/server/adapters/d1/testFixture';
 import { createLocalUiFixture, type LocalUiEnvironment } from './local-ui-fixture';
-import { runUiJourney } from './ui-journey';
+import type { Actor } from '../providers/contracts';
+import { privateFill, runUiJourney, type UiFixture } from './ui-journey';
+
+/**
+ * Pages that redirect in the same commit that selects a contest. The redirect and the
+ * effect that writes `?contest=` then race. Only a production build shows the race,
+ * because development StrictMode runs the redirect's effect a second time.
+ */
+async function checkContestRedirects(browser: Browser, fixture: UiFixture, db: LocalUiEnvironment['DB']) {
+  const write = (sql: string, ...values: string[]) => db.prepare(sql).bind(...values).run();
+  const atQueue = (page: Page, contest: string) => expect(page).toHaveURL((url) =>
+    url.pathname === '/issues' && url.searchParams.get('contest') === contest);
+  async function signIn(actor: Actor): Promise<Page> {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const { target, username, password } = fixture.accounts[actor];
+    await page.goto(new URL('/sign-in', fixture.origin).href);
+    if (target.kind === 'event') await page.getByLabel('Event code', { exact: true }).fill(target.code);
+    await privateFill(page.getByLabel('Username', { exact: true }), username);
+    await privateFill(page.getByLabel('Password', { exact: true }), password);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.locator('[data-ui]')).toBeVisible({ timeout: 45_000 });
+    return page;
+  }
+
+  // The isolated team holds a seat in the second contest. This entry adds the first. By name, the second opens first.
+  await write(`INSERT INTO teams (id, session_id, name, location, entrant_id)
+    SELECT ?, ?, 'Provider team 2', location, entrant_id FROM teams WHERE session_id = ?`,
+  randomUUID(), fixture.sessionId, fixture.otherSessionId);
+  const contestant = await signIn('isolated');
+  for (const search of ['', '?contest=bogus']) {
+    await contestant.goto(new URL(`/administration${search}`, fixture.origin).href);
+    await atQueue(contestant, fixture.otherSessionId);
+    await expect(contestant.getByRole('heading', { name: 'Your reports' })).toBeVisible();
+  }
+  await contestant.context().close();
+
+  // A third contest keeps the list at two after the loss. Its name sorts last, so nothing opens it.
+  const third = randomUUID();
+  await write(`INSERT INTO sessions (id, event_id, name, intake_open)
+    SELECT ?, event_id, 'Provider zulu', 1 FROM sessions WHERE id = ?`, third, fixture.sessionId);
+  const juryId = fixture.accounts.jury.id;
+  for (const contest of [fixture.otherSessionId, third]) {
+    await write('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)', contest, juryId);
+    await write(`INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')`, contest, juryId);
+  }
+  const jury = await signIn('jury');
+  await jury.goto(new URL(`/jury?contest=${fixture.sessionId}`, fixture.origin).href);
+  await expect(jury.getByRole('heading', { name: 'Award review', exact: true })).toBeVisible();
+  await write('DELETE FROM membership_roles WHERE session_id = ? AND account_id = ?', fixture.sessionId, juryId);
+  await write('DELETE FROM memberships WHERE session_id = ? AND account_id = ?', fixture.sessionId, juryId);
+  await jury.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await atQueue(jury, fixture.otherSessionId);
+  await expect(jury.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+  await jury.context().close();
+}
 
 test('complete local React UI journey uses real HTTPS, D1, R2, and Durable Objects', async ({ browser }) => {
   const directory = process.env.MINSKY_CF_LOCAL_UI_DIRECTORY;
@@ -44,6 +99,8 @@ test('complete local React UI journey uses real HTTPS, D1, R2, and Durable Objec
     phase = 'fictional account setup';
     fixture = await createLocalUiFixture(env, origin, secret);
     await runUiJourney(browser, fixture, { ignoreHTTPSErrors: true });
+    await checkContestRedirects(browser, fixture, env.DB);
+    await fixture.deleteEventInBrowser(browser);
   } catch (error) {
     if (fixture) throw error;
     // eslint-disable-next-line preserve-caught-error -- Configuration errors can contain the in-memory auth secret.

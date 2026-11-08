@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Scale,
   Send,
+  Undo2,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -644,6 +645,56 @@ export function ApplyForm({ issue, command, onDone }: IssueFormProps) {
       >
         <CheckCheck aria-hidden="true" />
         Confirm applied externally
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * Withdraws an award that nobody confirmed. The record stays and gives no
+ * time. The person must tick the confirmation first.
+ */
+export function WithdrawAwardForm({ issue, command, onDone }: IssueFormProps) {
+  const id = useId();
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void command.act(
+          { type: "withdraw_award", issue_id: issue.id, revision: issue.revision },
+          { onSuccess: onDone },
+        );
+      }}
+    >
+      <label
+        htmlFor={`${id}-confirm`}
+        className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm"
+      >
+        <input
+          id={`${id}-confirm`}
+          type="checkbox"
+          required
+          checked={confirmed}
+          disabled={command.locked}
+          onChange={(event) => setConfirmed(event.target.checked)}
+          className="mt-0.5 size-4 shrink-0 accent-current"
+        />
+        I want to withdraw this award. It will give no time.
+      </label>
+      <p className="text-xs text-muted-foreground">
+        The award stays in the record. This issue cannot take another award.
+      </p>
+      <Button
+        type="submit"
+        variant="destructive"
+        className="h-11 w-full"
+        disabled={command.locked || !confirmed}
+        loading={isRunning(command.running, "withdraw_award", issue.id)}
+      >
+        <Undo2 aria-hidden="true" />
+        Withdraw award
       </Button>
     </form>
   );

@@ -9,6 +9,9 @@ import type {
 import { errorMessage } from "@/backend/errors";
 import { keepFocus, useRefreshOnReturn } from "@/connected/hooks/useRefreshOnReturn";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
+import { levelRefusals } from "@/screens/NoLevelAccess";
+
+const DELETION_REFRESH_MS = 15_000;
 
 /** The site read and its commands, for webmasters. */
 export interface SiteState {
@@ -50,7 +53,7 @@ export function useSite(): SiteState {
     try {
       const next = await backend.manage.site();
       setSite(next ?? undefined);
-      setReadError(next ? "" : "Only a webmaster can open the site page.");
+      setReadError(next ? "" : levelRefusals.site.message);
     } catch (cause) {
       setReadError(errorMessage(cause));
     }
@@ -60,6 +63,15 @@ export function useSite(): SiteState {
     void reload();
   }, [reload]);
   useRefreshOnReturn(reload, running);
+  // A deletion has no socket, and the server advances it in the background.
+  const deleting = site?.deletions.some((deletion) => deletion.finishedAt === null) ?? false;
+  useEffect(() => {
+    if (!deleting) return undefined;
+    const interval = window.setInterval(() => {
+      if (!running.current) void reload();
+    }, DELETION_REFRESH_MS);
+    return () => window.clearInterval(interval);
+  }, [deleting, reload]);
   const run = useCallback(
     async <T>(
       key: string,

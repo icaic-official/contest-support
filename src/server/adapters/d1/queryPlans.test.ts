@@ -3,6 +3,7 @@ import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
 import { calendarSql, contestsListSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { contestDataSql, signInAccountSql } from '../cloudflare/authority';
+import { CLAIM_DELETION_SQL } from '../cloudflare/eventDeletion';
 import { claimSql } from '../cloudflare/live';
 import { eventConsoleSql, siteEventsSql } from '../cloudflare/manage';
 import type { D1Connection } from './connection';
@@ -25,6 +26,7 @@ const queries: Record<string, string> = {
   'site events': siteEventsSql,
   'event sign-in': signInAccountSql.event,
   'site sign-in': signInAccountSql.site,
+  'deletion claim': CLAIM_DELETION_SQL,
 };
 
 // Both snapshots materialize the resolver row as `access` and read it as `c`.
@@ -35,6 +37,9 @@ const queries: Record<string, string> = {
 const materializedScans = new Map([
   [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c|x)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
+  // The list materializes the caller's contests with their extra minutes as `viewer`, and reads it as `v`.
+  // It must not allow `c`: `extraMinutesSql` reads `contest_awards` as `c`, so a scan of that table would pass.
+  [contestsListSql, /^SCAN v$/],
   // The webmaster row holds the account's site grant, if it has one. It is one row, and it gates the site branch.
   [calendarSql, /^SCAN webmaster$/],
   // The site page lists every event, and the site has few.
@@ -87,6 +92,12 @@ describe('D1 query plans', () => {
       expect(await fullScans(sql)).toEqual([]);
     });
   }
+
+  it('finds an open deletion through its partial index, with no sort', async () => {
+    const details = await plan(CLAIM_DELETION_SQL);
+    expect(details).toContain('USING INDEX event_deletions_open (lease_until<?)');
+    expect(details).not.toContain('TEMP B-TREE');
+  });
 
   it('finds the contests of an account through the account index', async () => {
     expect(await plan(contestsListSql)).toContain('USING COVERING INDEX memberships_account_session (account_id=?)');

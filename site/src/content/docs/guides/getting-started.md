@@ -18,7 +18,7 @@ A wrong event code, username, or password gives the same message. Check all thre
 
 A team shares one account. A single contestant has their own account. Each staff member has a personal account, so the history shows who acted.
 
-Webmasters run the whole site and belong to no event. A webmaster selects **Site sign-in** on the sign-in page, which asks for no event code.
+Webmasters run the whole site and belong to no event. A webmaster selects **Site sign-in** on the sign-in page, which asks for no event code. See [Run the site as a webmaster](/guides/webmaster/).
 
 ## Choose a contest
 
@@ -33,7 +33,11 @@ If you can open more than one contest, select the contest in one of these places
 | The staff phone app | **Contest session** on the **Me** tab |
 | The account page in the console or the contestant app | **Switch** under **Sessions** |
 
-A page reload opens the first contest in the list again, so check the contest name after a reload.
+The list shows the contests in the order of their start times. A contest with a schedule shows its start time in the event's time zone. The start time shows the year only when your contests start in different years.
+
+Intake is the time when contestants can send new reports. A note under the name says what the contest does now: "Running now", "Intake open (grace period)", "Intake open (set by staff)", "Intake closed (set by staff)", "Waiting for live passwords", or "Ended". A contest that has not started has no note, because its start time says it. Two cases get a note anyway: staff hold its intake open or closed, or it waits for live passwords. The note of the contest that is running now is in heavier text. A contestant's note counts the extra minutes that staff confirmed for that contestant, so a contest can say "Running now" for you after its scheduled end.
+
+Minsky opens the contest whose intake is open. If no intake is open, it opens the first contest that has not ended. If every contest has ended, it opens the one that ended last. The address of the browser tab keeps your choice, so a reload keeps it. In that tab, Minsky uses that choice only for your account. When another person signs in on the same browser tab, Minsky opens a contest for them by the rules above. This is also true after Back, after a reload, and after your contest ends. If nobody else signed in on that tab since, Minsky opens your choice when you sign in again. A link that names a contest opens that contest for the person who signs in, if that person belongs to it. A Minsky page that someone opens in a new tab or window counts as such a link.
 
 An account with no contest sees **Session access** and no data. Ask your organizer to assign you, and then select **Refresh access**.
 
@@ -65,7 +69,7 @@ Your roles decide the tabs and pages. Several roles combine.
 | Contest admin | **Queue**, **Find**, **Session**, **Me** | **Queue**, **Teams & tables**, **Overview**, **Accounts**, **Team locations**, **Session settings** |
 
 The account page shows a contest admin as **Session admin**.
-An event admin or a webmaster works as a contest admin in a contest. These people also see **Event console**, and a webmaster also sees **Site**.
+An event admin or a webmaster works as a contest admin in a contest. These people also see **Event console**, and a webmaster also sees **Site**. See [Run an event](/guides/event-admin/) and [Run the site as a webmaster](/guides/webmaster/).
 
 To reach your account settings, use one of these controls:
 

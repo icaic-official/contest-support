@@ -94,6 +94,8 @@ const award = {
   at: "2026-10-17T10:30:00Z",
   applied_at: null,
   applied_name: null,
+  withdrawn_at: null,
+  withdrawn_name: null,
 };
 
 const time = (value: string) => value.slice(11, 16);
@@ -271,6 +273,19 @@ describe("conversation", () => {
       "event:You reopened the issue: Back",
       "staff:Resolved: typed by hand",
     ]);
+  });
+
+  it("shows a withdrawn award as two events and never its minutes or explanation", () => {
+    const text = (award: boolean) => conversation(
+      [
+        entry({ text: "5 minutes awarded: Judge outage" }),
+        ...(award ? [] : [entry({ text: "Time award withdrawn. It gives no time." })]),
+      ],
+      { issue: issue(), resolutions: [], award: undefined, userId: TEAM_USER },
+    ).map((item) => (item.kind === "event" ? `event:${item.text}` : `message:${item.entry.text}`));
+    expect(text(false)).toEqual(["event:The jury decided a time award", "event:The jury withdrew the time award"]);
+    // Without a withdrawal, typed award text stays a message.
+    expect(text(true)).toEqual(["message:5 minutes awarded: Judge outage"]);
   });
 });
 

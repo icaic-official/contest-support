@@ -153,8 +153,10 @@ SELECT json_object(
   'awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', w.id, 'issue_id', w.issue_id, 'resolution_id', w.resolution_id,
       'minutes', w.minutes, 'explanation', w.explanation, 'actor_name', w.actor_name,
-      'at', w.at, 'applied_at', w.applied_at, 'applied_name', w.applied_name) AS row
-    FROM awards w JOIN visible_issues i ON i.id = w.issue_id ORDER BY w.at, w.id)), '[]')),
+      'at', w.at, 'applied_at', w.applied_at, 'applied_name', w.applied_name,
+      'withdrawn_at', w.withdrawn_at, 'withdrawn_name', w.withdrawn_name) AS row
+    FROM awards w JOIN visible_issues i ON i.id = w.issue_id CROSS JOIN access a
+    WHERE w.withdrawn_at IS NULL OR a.staff = 1 ORDER BY w.at, w.id)), '[]')),
   'attachments', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'uploader', x.uploader,
       'uploader_name', x.uploader_name, 'uploaded_at', x.uploaded_at,
@@ -351,6 +353,7 @@ describe('rows read for a session with 1,200 accounts and 100 issues', () => {
       get: async () => ({ size: 1, body: new Response('x').body!, arrayBuffer: async () => new ArrayBuffer(1) }),
       put: async () => null,
       delete: async () => {},
+      list: async () => ({ objects: [], truncated: false }),
     };
     const staff = ['acc-1', 'acc-2', 'acc-3'];
     for (const [n, owners, ceiling] of [

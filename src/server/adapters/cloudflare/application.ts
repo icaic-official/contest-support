@@ -4,8 +4,8 @@ import { snapshotSchema, type Snapshot } from '../../../connected/model';
 import type { Caller } from '../../authentication';
 import { AuthenticationError } from '../../authentication';
 import type { D1Connection, D1Statement, D1Value } from '../d1/connection';
-import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql } from './authority';
-import { clockSql, extraMinutesSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, type ScheduleColumns } from './schedule';
+import { calendarEventSql, calendarWebmasterSql, contestDataBindings, contestDataSql, contestListBindings, contestSeatsSql, notBeingDeletedSql } from './authority';
+import { clockSql, intakeOpenSql, intakeStateSql, parseIntake, scheduleOf, viewerExtraSql, type ScheduleColumns } from './schedule';
 
 /** Bind accountId, loginId. This check also works after an authorized self-removal. */
 export const currentReadyLoginSql = `SELECT a.id FROM accounts a JOIN logins l ON l.account_id = a.id
@@ -32,7 +32,7 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 // both use it. The contest keeps today's reads without a schedule.
 const extra = 'x.minutes';
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
-  extra_minutes AS MATERIALIZED (SELECT CASE WHEN s.ends_at IS NULL THEN 0 ELSE ${extraMinutesSql('s', 'a.team_id')} END AS minutes
+  extra_minutes AS MATERIALIZED (SELECT ${viewerExtraSql('s', 'a.team_id')} AS minutes
     FROM access a JOIN sessions s ON s.id = a.session_id),
   visible_issues AS MATERIALIZED (SELECT i.* FROM access a CROSS JOIN issues i
     WHERE (i.session_id = ? AND i.team_id = a.team_id) OR (a.staff = 1 AND i.session_id = ?))
@@ -83,8 +83,10 @@ SELECT json_object(
   'awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', w.id, 'issue_id', w.issue_id, 'resolution_id', w.resolution_id,
       'minutes', w.minutes, 'explanation', w.explanation, 'actor_name', w.actor_name,
-      'at', w.at, 'applied_at', w.applied_at, 'applied_name', w.applied_name) AS row
-    FROM awards w JOIN visible_issues i ON i.id = w.issue_id ORDER BY w.at, w.id)), '[]')),
+      'at', w.at, 'applied_at', w.applied_at, 'applied_name', w.applied_name,
+      'withdrawn_at', w.withdrawn_at, 'withdrawn_name', w.withdrawn_name) AS row
+    FROM awards w JOIN visible_issues i ON i.id = w.issue_id
+    WHERE w.withdrawn_at IS NULL OR c.staff = 1 ORDER BY w.at, w.id)), '[]')),
   'attachments', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'uploader', x.uploader,
       'uploader_name', x.uploader_name, 'uploaded_at', x.uploaded_at,
@@ -123,16 +125,27 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-const contestColumns = `c.session_id AS id, c.session_name AS name, c.event_id, c.manage, e.name AS event_name, e.time_zone,
+const contestColumns = (extraSql: string, row = 'c') => `${row}.session_id AS id, ${row}.session_name AS name, ${row}.event_id, ${row}.manage, e.name AS event_name, e.time_zone,
   s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule, s.intake_open,
-  ${intakeStateSql('s')} AS intake`;
+  ${intakeStateSql('s', extraSql)} AS intake`;
 
-/** Every contest that the caller can open. Bind with contestListBindings. */
-export const contestsListSql = `SELECT ${contestColumns}, 1 AS can_open FROM (${contestDataSql('contests')}) c
-  JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id ORDER BY c.session_name, c.session_id`;
+/**
+ * Every contest that the caller can open, each with the caller's own intake: a
+ * contestant's confirmed extra time keeps a contest open past its scheduled end,
+ * as the contest's own clock says. `viewer` reads the minutes once for each
+ * contest, because `intakeStateSql` uses them several times. Bind with contestListBindings.
+ */
+export const contestsListSql = `WITH viewer AS MATERIALIZED (SELECT c.session_id, c.session_name, c.event_id, c.manage,
+    ${viewerExtraSql('s', 'c.team_id')} AS extra
+    FROM (${contestDataSql('contests')}) c JOIN sessions s ON s.id = c.session_id)
+  SELECT ${contestColumns('v.extra', 'v')}, 1 AS can_open FROM viewer v
+  JOIN sessions s ON s.id = v.session_id JOIN events e ON e.id = s.event_id ORDER BY v.session_name, v.session_id`;
 
-/** The contests of one event that the caller can open. Bind with contestListBindings, then the event ID. */
-export const eventContestsSql = `SELECT ${contestColumns}, 1 AS can_open FROM (${contestDataSql('contests')}) c
+/**
+ * The contests of one event that the caller can open, with the intake of the
+ * contest alone, for the event console. Bind with contestListBindings, then the event ID.
+ */
+export const eventContestsSql = `SELECT ${contestColumns('0')}, 1 AS can_open FROM (${contestDataSql('contests')}) c
   JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id WHERE c.event_id = ?
   ORDER BY c.session_name, c.session_id`;
 
@@ -154,7 +167,7 @@ const calendarRow = (from: string, scope: string) => `SELECT s.id, s.name, s.eve
   WHERE ${scope} AND s.ends_at > ? AND s.starts_at < ?`;
 export const calendarSql = `WITH login AS (${currentReadyLoginSql}), webmaster AS MATERIALIZED (${calendarWebmasterSql}),
   reach AS MATERIALIZED (SELECT c.session_id, c.manage FROM (${contestDataSql('contests')}) c)
-SELECT * FROM (${calendarRow('login', calendarEventSql)} UNION ALL ${calendarRow('webmaster CROSS JOIN login', '1')})
+SELECT * FROM (${calendarRow('login', calendarEventSql)} UNION ALL ${calendarRow('webmaster CROSS JOIN login', notBeingDeletedSql('s.event_id'))})
 ORDER BY starts_at, id LIMIT ${CALENDAR_LIMIT}`;
 
 interface ContestRow extends ScheduleColumns {

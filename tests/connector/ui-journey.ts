@@ -14,7 +14,7 @@ const sessionName = 'Provider primary';
 const phone = { width: 390, height: 844 };
 const desktop = { width: 1280, height: 900 };
 
-async function privateFill(locator: Locator, value: string) {
+export async function privateFill(locator: Locator, value: string) {
   try { await locator.fill(value); }
   catch { throw new Error('A credential field could not be filled. Its value was withheld.'); }
 }
@@ -200,7 +200,8 @@ export async function runUiJourney(browser: Browser, fixture: UiFixture, options
     const switcher = uiRoot(page).getByRole('button', { name: /^Contest session: / });
     if (await switcher.count() && !(await switcher.getAttribute('aria-label'))?.includes(sessionName)) {
       await switcher.click();
-      await page.getByRole('menuitemradio', { name: sessionName, exact: true }).click();
+      // A row's name also holds its start time and its intake note.
+      await page.getByRole('menuitemradio', { name: new RegExp(`^${sessionName}( |$)`) }).click();
     }
     await expect(uiRoot(page)).toContainText(sessionName);
     await expect(liveBadge(page)).toBeVisible({ timeout: 30_000 });

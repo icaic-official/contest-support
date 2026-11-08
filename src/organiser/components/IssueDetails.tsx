@@ -5,6 +5,7 @@ import {
   Clock,
   Lock,
   RotateCcw,
+  Undo2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { historyText } from "@/connected/historyEvents";
@@ -232,15 +233,25 @@ export function AwardReceipt({
           variant="outline"
           className={cn(
             "bg-background",
-            award.applied_at ? "text-status-resolved" : "text-status-escalated",
+            award.withdrawn_at
+              ? "text-muted-foreground"
+              : award.applied_at
+                ? "text-status-resolved"
+                : "text-status-escalated",
           )}
         >
-          {award.applied_at ? (
+          {award.withdrawn_at ? (
+            <Undo2 aria-hidden="true" />
+          ) : award.applied_at ? (
             <CheckCheck aria-hidden="true" />
           ) : (
             <Clock aria-hidden="true" />
           )}
-          {award.applied_at ? "Applied externally" : "Pending external application"}
+          {award.withdrawn_at
+            ? "Withdrawn · gives no time"
+            : award.applied_at
+              ? "Applied externally"
+              : "Pending external application"}
         </Badge>
       </div>
       <p className="mt-1 text-sm">{award.explanation}</p>
@@ -254,7 +265,15 @@ export function AwardReceipt({
         Decided by {award.actor_name} · {formatDate(award.at)}
         {award.applied_at &&
           ` · confirmed by ${award.applied_name ?? "staff"} · ${formatDate(award.applied_at)}`}
+        {award.withdrawn_at &&
+          ` · withdrawn by ${award.withdrawn_name ?? "staff"} · ${formatDate(award.withdrawn_at)}`}
       </p>
+      {award.withdrawn_at && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          A withdrawn award stays in the record. This issue cannot take another
+          award.
+        </p>
+      )}
       <p className="mt-1 text-xs text-muted-foreground">
         Minsky records confirmation only. It does not change a contest clock.
       </p>

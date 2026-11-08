@@ -5,11 +5,14 @@ import {
   useRef,
   useState,
 } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { backend } from "@/backend";
 import type { ContestSummary } from "@/backend/contracts";
 import { errorMessage } from "@/backend/errors";
+import { defaultContest, orderContests } from "../contestList";
 import { keepUnchanged } from "../keepUnchanged";
 import type { Snapshot } from "../model";
+import { contestOfSearch, contestOwnerOf, searchWithContest, withContestOwner } from "../navigation";
 import { createRefreshQueue } from "./refreshQueue";
 import { boundaryDelay, startRefreshSchedule } from "./refreshSchedule";
 
@@ -18,6 +21,14 @@ export type SessionSummary = ContestSummary;
 
 /** Shared session data for every UI. Read it; do not copy it into state. */
 export interface SessionData {
+  /**
+   * The contests that the person may open. A read that starts with no chosen
+   * contest fills it before the snapshot arrives, so it can be full while
+   * `sessionId` is "", whether `loaded` is true or false. A screen that shows
+   * a picker waits for `sessionId`. Once a contest is chosen, a read fills it
+   * early only while that contest stays in the list, so `sessionId` is "" or
+   * in this list.
+   */
   sessions: SessionSummary[];
   /** The selected session, or "" before the first refresh. */
   sessionId: string;
@@ -53,11 +64,20 @@ function inBackground(): boolean {
 }
 
 /**
- * Loads the person's sessions and the selected session snapshot. It refreshes
- * on live changes, on focus, when the tab becomes visible and when the browser
- * comes back online. A timer refreshes every 10 seconds while the live channel
- * is down, and every 60 seconds while it is connected. The timer also drives
- * the independent reads: each tick adds one to `updates`.
+ * Loads the person's sessions and the selected session snapshot. The first
+ * read opens the contest that `?contest=` names, else the one that runs now,
+ * else the next one. `sessionId` is the only record of the choice. For a
+ * person with several contests the address holds a copy, so a reload keeps
+ * the choice. The hook reads the address once, when it starts. The copy names
+ * its account in the router state of the history entry. The hook ignores the
+ * copy of another account, so the next person on a tab starts from the
+ * default. An address with no owner came from outside the app, such as a
+ * shared link, and the hook honors it.
+ *
+ * It refreshes on live changes, on focus, when the tab becomes visible and
+ * when the browser comes back online. A timer refreshes every 60 seconds, with
+ * the live channel down or connected. The timer also drives the independent
+ * reads: each tick adds one to `updates`.
  */
 export function useSessionSnapshot(userId: string): SessionData {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -67,30 +87,60 @@ export function useSessionSnapshot(userId: string): SessionData {
   const [refreshError, setRefreshError] = useState("");
   const [connected, setConnected] = useState(false);
   const [updates, setUpdates] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The contest that the address named when the hook started, unless another
+  // account chose it. A read honors it until one read succeeds. A later access
+  // loss then falls back to the default.
+  const owner = contestOwnerOf(location.state);
+  const addressed = useRef(owner === undefined || owner === userId ? contestOfSearch(location.search) : undefined);
   const clockOffset = useRef(0);
   // Server time of the newest snapshot shown. An older snapshot never replaces it.
   const shownAt = useRef(0);
   const generation = useRef(0);
-  // The session that the last successful read showed, so the subscribe effect
-  // does not read it again straight after the read that selected it.
+  // The session that the last read selected, so the subscribe effect does not
+  // read it again straight after that read.
   const readFor = useRef<string>(undefined);
   const [queue] = useState(createRefreshQueue);
   const refresh = useCallback(() => {
     const run = generation.current;
-    // Serialize reads so an older Realtime response cannot overwrite a newer
-    // revision. A write waits for its own refresh before enabling controls.
-    // A read that has not started yet serves every caller that arrives before it starts.
+    // Serialize the reads of one generation so an older Realtime response
+    // cannot overwrite a newer revision. A read of a newer generation does not
+    // wait for an older one. A write waits for its own refresh before enabling
+    // controls. A read that has not started yet serves every caller that
+    // arrives before it starts.
     return queue.read(run, async () => {
+      // Set when the list arrives, so that a failed snapshot read can still show it.
+      let listed: { list: SessionSummary[]; nextSession: string } | undefined;
       try {
-        const list = await backend.workflows.contests();
-        const nextSession = list.some((s) => s.id === sessionId)
+        const list = orderContests(await backend.workflows.contests());
+        // A read that a change of contest or a remount has made stale reads no
+        // snapshot, because nothing would show it.
+        if (run !== generation.current) return;
+        // Only a listed ID reaches the snapshot read and the live channel.
+        const isListed = (id: string) => list.some((s) => s.id === id);
+        const seed = addressed.current;
+        const nextSession = isListed(sessionId)
           ? sessionId
-          : (list[0]?.id ?? "");
+          : seed !== undefined && isListed(seed)
+            ? seed
+            : (defaultContest(list, Date.now() + clockOffset.current)?.id ?? "");
+        listed = { list, nextSession };
+        // The list goes out before the snapshot read in two cases. No contest is
+        // chosen yet, so a screen that needs only the list, such as the site
+        // page, never waits on the snapshot. Or the chosen contest stays in the
+        // list. Otherwise the picker would have no open row for one read.
+        // The selected ID always waits for the snapshot. A change of it
+        // restarts the effect below, which drops this read.
+        if (sessionId === "" || nextSession === sessionId) {
+          setSessions((shown) => keepUnchanged(shown, list));
+        }
         const next = nextSession
           ? await backend.workflows.snapshot(nextSession)
           : undefined;
         if (run !== generation.current) return;
         readFor.current = nextSession;
+        addressed.current = undefined;
         setSessions((shown) => keepUnchanged(shown, list));
         setSessionId(nextSession);
         setState((shown) => (next?.membership ? keepUnchanged(shown, next) : undefined));
@@ -101,6 +151,13 @@ export function useSessionSnapshot(userId: string): SessionData {
         setRefreshError("");
       } catch (cause) {
         if (run !== generation.current) return;
+        // The picker on the no-access screen is the way out of a contest that fails.
+        if (listed) {
+          const { list, nextSession } = listed;
+          readFor.current = nextSession;
+          setSessions((shown) => keepUnchanged(shown, list));
+          setSessionId(nextSession);
+        }
         // Clear cached data on access/network failure; never display stale permissions.
         setState(undefined);
         setRefreshError(errorMessage(cause));
@@ -111,7 +168,7 @@ export function useSessionSnapshot(userId: string): SessionData {
   const applySnapshot = useCallback(
     (forSession: string, next: Snapshot) => {
       const run = generation.current;
-      return queue.after(() => {
+      return queue.after(run, () => {
         if (run !== generation.current || forSession !== sessionId) return false;
         if (!next.membership) return false;
         const at = Date.parse(next.server_time);
@@ -186,6 +243,32 @@ export function useSessionSnapshot(userId: string): SessionData {
     const timer = window.setTimeout(() => tick.current?.(), delay);
     return () => window.clearTimeout(timer);
   }, [changesAt]);
+  // The address follows the choice and never decides it. A replace adds no
+  // history entry. The hash, the router state and the other parameters stay,
+  // because the account page reads the hash and the state to place focus. The
+  // state also gets the owner. A link drops the state, so a new entry gets the
+  // owner here too.
+  const several = sessions.length > 1;
+  useEffect(() => {
+    if (!sessionId || !several) return;
+    if (contestOfSearch(location.search) === sessionId && contestOwnerOf(location.state) === userId) return;
+    // `BrowserRouter` renders a navigation in a transition, after `history` has
+    // written it. A replace from this older location would overwrite that entry.
+    // So this waits, and the `location` dependency runs it again on commit. The
+    // hash stays out, because the skip link writes one that the router never sees.
+    if (location.pathname !== window.location.pathname || location.search !== window.location.search) {
+      return;
+    }
+    void navigate(
+      {
+        pathname: location.pathname,
+        // eslint-disable-next-line no-restricted-syntax -- This write makes the signed-in account the owner.
+        search: searchWithContest(location.search, sessionId),
+        hash: location.hash,
+      },
+      { replace: true, state: withContestOwner(location.state, userId) },
+    );
+  }, [location, navigate, sessionId, several, userId]);
   const selectSession = useCallback((next: string) => {
     generation.current++;
     readFor.current = undefined;

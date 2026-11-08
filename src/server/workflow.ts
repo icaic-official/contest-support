@@ -22,7 +22,7 @@ export interface WorkflowState {
     owner: string | null; revision: number;
   } | null;
   resolution: { id: string } | null;
-  award: { id: string; applied_at: string | null } | null;
+  award: { id: string; applied_at: string | null; withdrawn_at: string | null } | null;
 }
 
 /** A closed set of operations, with time supplied by the atomic persistence commit. */
@@ -37,6 +37,7 @@ export interface WorkflowDecision {
   reopen?: { reason: string };
   award?: { resolutionId: string; minutes: number; explanation: string };
   apply?: { awardId: string };
+  withdraw?: { awardId: string };
 }
 
 export interface WorkflowRead {
@@ -177,13 +178,21 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
       decision.history.text = `${command.minutes} minutes awarded: ${decision.award.explanation}`;
       break;
     case 'apply': {
-      if (!can(seat, 'apply') || !state.award || state.award.applied_at !== null) {
+      if (!can(seat, 'apply') || !state.award || state.award.applied_at !== null || state.award.withdrawn_at !== null) {
         return reject('state');
       }
       decision.apply = { awardId: state.award.id };
       decision.history.text = 'External application confirmed. No contest clock was changed by Minsky.';
       break;
     }
+    case 'withdraw_award':
+      // The row stays, and `awards.issue_id` is unique, so the issue takes no second award.
+      if (!can(seat, 'award') || !state.award || state.award.applied_at !== null || state.award.withdrawn_at !== null) {
+        return reject('state');
+      }
+      decision.withdraw = { awardId: state.award.id };
+      decision.history.text = 'Time award withdrawn. It gives no time.';
+      break;
   }
   return decision;
 }

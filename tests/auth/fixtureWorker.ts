@@ -1,5 +1,6 @@
 import { createAuthenticationHandler } from '../../src/server/authenticationHttp';
 import { D1AuthenticationService } from '../../src/server/adapters/cloudflare/authentication';
+import { removeFixtureEvent } from '../../src/server/adapters/cloudflare/eventDeletionFixture';
 import { createBetterAuthIdentity } from '../../src/server/adapters/cloudflare/identity';
 import { passwordHasher, randomSecret } from '../../src/server/adapters/cloudflare/password';
 import type { D1Binding } from '../../src/server/adapters/d1/connection';
@@ -30,8 +31,8 @@ export default {
         const hash = await passwordHasher.hash(password);
         const now = new Date().toISOString();
         await env.DB.batch([
-          env.DB.prepare('INSERT INTO accounts (id, name, username, must_change) VALUES (?, ?, ?, 1)').bind(id, 'Fictional browser fixture', username),
           env.DB.prepare('INSERT INTO events (id) VALUES (?)').bind(id),
+          env.DB.prepare('INSERT INTO accounts (id, name, username, handle, event_id, must_change) VALUES (?, ?, ?, ?, ?, 1)').bind(id, 'Fictional browser fixture', username, username, id),
           env.DB.prepare('INSERT INTO sessions (id, event_id) VALUES (?, ?)').bind(id, id),
           env.DB.prepare('INSERT INTO memberships (session_id, account_id, is_admin) VALUES (?, ?, 1)').bind(id, id),
           env.DB.prepare(`INSERT INTO ba_user (id, name, email, emailVerified, createdAt, updatedAt, username)
@@ -43,12 +44,7 @@ export default {
         return json({ id, event: event!.code, username, password }, 201);
       }
       if (request.method === 'DELETE') {
-        await env.DB.batch([
-          env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
-          env.DB.prepare('DELETE FROM ba_user WHERE id = ?').bind(id),
-          env.DB.prepare('DELETE FROM events WHERE id = ?').bind(id),
-          env.DB.prepare('DELETE FROM authentication_limits WHERE key IN (?, ?)').bind(`handle:${id}:${username}`, `change:${id}`),
-        ]);
+        await removeFixtureEvent(env.DB, id);
         const remaining = await env.DB.prepare(`SELECT
           (SELECT count(*) FROM accounts WHERE id = ?) +
           (SELECT count(*) FROM ba_user WHERE id = ?) +

@@ -153,6 +153,9 @@ export const snapshotSchema = z.object({
       at: time,
       applied_at: time.nullable(),
       applied_name: z.string().nullable(),
+      /** Staff read a withdrawn award. It gives no time, and a contestant never reads one. */
+      withdrawn_at: time.nullable().default(null),
+      withdrawn_name: z.string().nullable().default(null),
     }),
   ),
   members: z.array(
@@ -217,7 +220,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     team_id: z.string().optional(),
   }),
   z.object({
-    type: z.enum(["claim", "accept", "escalate", "apply"]),
+    type: z.enum(["claim", "accept", "escalate", "apply", "withdraw_award"]),
     ...target,
   }),
   z.object({

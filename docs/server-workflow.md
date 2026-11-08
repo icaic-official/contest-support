@@ -22,6 +22,7 @@ These rules apply while the event is not archived. An archived event rejects eve
 | `reopen` | The affected team or support reopens a resolved issue. Intake state does not restrict reopening. | Reopening reason, actor, and time. Claimed status resumes with the prior owner. |
 | `award` | Jury awards nonnegative whole minutes to a resolved issue. Only one award can exist per issue. | Award linked to the current resolution, with an explanation and actor. Zero minutes is valid. |
 | `apply` | Support or jury confirms a pending award, including after reopening. | Separate application time and actor. Minsky changes no external clock. |
+| `withdraw_award` | Jury withdraws a pending award that nobody confirmed, including after reopening. | Withdrawal time and actor on the same award row. The award gives no time, and the issue cannot take another award. The team does not read the award, but reads the public history entry. |
 
 Support means volunteer or specialist.
 Assigned roles combine capabilities.

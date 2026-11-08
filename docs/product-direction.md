@@ -42,6 +42,7 @@ No production installation exists. Live-contest use and the [capacity targets](#
 - A contestant's personal end time is the scheduled end plus the minutes that staff confirmed as applied. That contestant can report until the personal end time plus the grace period.
 - A live contest stays closed until every contestant sign-in has a fresh live password. The manual override cannot open it earlier.
 - A calendar shows each member the contests of their own events. Webmasters see every event.
+- A webmaster can delete an event permanently, after a typed confirmation of its name, or of its code when it has no name. The deletion removes the event's records, files, and live data, and it cannot reach another event.
 - An archived event permits reading only. Archived events are never deleted automatically. No screen or command sets the archived state.
 
 ### Issue timers and ownership
@@ -128,7 +129,7 @@ Minsky needs a network connection. Offline capture, venue-local resilience, and 
 
 ## Agreed but not built
 
-- Permanent deletion of an event by a webmaster, after a typed confirmation that names what is lost. The [event platform design](event-platform-design.md) plans this work as Phases 7 and 8.
+- An editor for the name, code, and time zone of an event.
 - Role and permission administration.
 - Linked reports. A recurrence would become a linked new report, and a duplicate would link to a canonical report.
 - Shared incidents, with explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.

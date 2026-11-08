@@ -2,7 +2,7 @@ import { CircleAlert, CircleUserRound, ListChecks, Plus, RotateCw, SquarePen } f
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { AccountPage, useOpenPasswordChange } from "@/connected/AccountPage";
-import { useRouteFocus } from "@/connected/navigation";
+import { keepContest, skipToFragment, useRouteFocus } from "@/connected/navigation";
 import { TabBar } from "@/components/tab-bar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,8 @@ export function ContestantApp(props: ShellProps) {
   const workflow = useWorkflowState(data);
   const { command, selectedIssueId, selectIssue } = workflow;
   const now = useNow(data.clockOffset);
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const navigate = useNavigate();
   const typing = useTyping();
   const accountPage = pathname.replace(/\/+$/u, "") === "/account";
@@ -104,7 +105,10 @@ export function ContestantApp(props: ShellProps) {
     // React Router keeps the navigation state of an entry under `usr`.
     const marked = () =>
       Boolean((window.history.state as { usr?: Record<string, unknown> } | null)?.usr?.[screenMark]);
-    if (!marked()) void navigate({ pathname, search }, { state: { [screenMark]: true } });
+    if (!marked()) {
+      const entry = keepContest(location, pathname, { [screenMark]: true });
+      void navigate(entry.to, { state: entry.state });
+    }
     const onPop = () => {
       if (marked()) return;
       setReporting(false);
@@ -318,6 +322,7 @@ export function ContestantApp(props: ShellProps) {
       {!accountPage && (desktop || view !== "home") && (
         <a
           href="#contestant-main"
+          onClick={skipToFragment}
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"
         >
           Skip to report details

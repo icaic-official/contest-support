@@ -26,6 +26,12 @@ export interface PrivateBucket {
     customMetadata: Record<string, string>;
   }): Promise<unknown | null>;
   delete(keys: string[]): Promise<void>;
+  /** A page can be empty while `truncated` is true, so follow the cursor. */
+  list(options: { prefix: string; cursor?: string; limit?: number }): Promise<{
+    objects: Array<{ key: string }>;
+    truncated: boolean;
+    cursor?: string;
+  }>;
 }
 
 interface Image {

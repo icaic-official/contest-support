@@ -18,7 +18,7 @@ A contest admin cannot create accounts, assign people, or change the schedule. A
 The reset signs the account out everywhere. History stays, and the account keeps its username.
 You cannot reset your own password here. Use **Change password** on your account page.
 
-A contest admin can reset an account only when that account has no event or site authority and when you administer every contest that it sits in. An event admin can reset every other account of the event.
+A contest admin can reset an account only when that account has no event or site authority, sits in at least one contest, and sits only in contests that you administer. An event admin can reset every other account of the event.
 
 Minsky refuses a reset that would sign a contestant out of another open contest. Close that contest first, or wait until it ends.
 
@@ -53,7 +53,7 @@ A category that an issue uses stays in the list and keeps its name, because the 
 
 ## Control intake
 
-Intake opens at the contest's start and closes at its end plus the grace period. An event admin [sets the schedule](/guides/event-admin/#create-a-contest).
+Intake opens at the contest's start and closes at its end plus the grace period. An event admin [sets the schedule](/guides/event-admin/#create-contests).
 A contestant's own end time is the contest's end plus the minutes that staff confirmed as applied. That contestant can report until the personal end time plus the grace period.
 
 The **Contestant intake** panel shows the state in **Session settings** in the console and on the **Session** tab of a phone. It has these controls:

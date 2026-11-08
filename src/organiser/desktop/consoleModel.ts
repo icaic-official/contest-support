@@ -215,9 +215,11 @@ export function awardSummary(
   issues: readonly Issue[],
   awards: Snapshot["awards"],
 ): AwardSummary {
+  // A withdrawn award gives no time and waits for nothing.
+  const standing = awards.filter((award) => !award.withdrawn_at);
   return {
-    minutes: awards.reduce((total, award) => total + award.minutes, 0),
-    pending: awards.filter((award) => !award.applied_at).length,
+    minutes: standing.reduce((total, award) => total + award.minutes, 0),
+    pending: standing.filter((award) => !award.applied_at).length,
     applied: awards.filter((award) => award.applied_at).length,
     undecided: issues.filter(
       (issue) =>

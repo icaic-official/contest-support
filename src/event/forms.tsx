@@ -32,15 +32,16 @@ export function Panel({
   );
 }
 
-/** After a removal, moves focus to the same place in the list, or to the page heading when the list is empty. */
-export function focusAfterRemoval(button: HTMLElement) {
+/**
+ * The control that takes focus when the row of `button` is removed: the button of the next row, else of the previous
+ * row, else the page heading. Call it when the user presses `button`, and focus the result once the removal succeeded.
+ * The neighbour is already on the page and stays there, so focus does not wait for the list to render without the row.
+ */
+export function heirOfRemovedRow(button: HTMLElement): HTMLElement | null {
   const list = button.closest("ul");
   const buttons = list ? Array.from(list.querySelectorAll<HTMLElement>("button[data-removes]")) : [];
   const index = buttons.indexOf(button);
-  requestAnimationFrame(() => {
-    const left = list?.isConnected ? Array.from(list.querySelectorAll<HTMLElement>("button[data-removes]")) : [];
-    (left[index] ?? left.at(-1) ?? document.querySelector<HTMLElement>("h1[tabindex]"))?.focus();
-  });
+  return buttons[index + 1] ?? buttons[index - 1] ?? document.querySelector<HTMLElement>("h1[tabindex]");
 }
 
 /** The error of the last command. `Alert` already announces it. */

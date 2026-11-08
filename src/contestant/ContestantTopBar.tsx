@@ -1,5 +1,4 @@
 import { ChevronDown, KeyRound, LogOut, MapPin } from "lucide-react";
-import { Link } from "react-router";
 import { useRef } from "react";
 import { BrandMark } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -14,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ContestLink } from "@/connected/ContestLink";
 import { ContestPicker } from "@/connected/ContestPicker";
 import type { SessionSummary } from "@/connected/hooks/useSessionSnapshot";
 import { cn } from "@/lib/utils";
@@ -67,13 +67,13 @@ export function ContestantTopBar({
   const afterClose = useRef<(() => void) | undefined>(undefined);
   return (
     <header className="flex h-14 shrink-0 items-center gap-1 border-b px-2 lg:gap-4 lg:px-5">
-      <Link
+      <ContestLink
         to="/issues"
         aria-label="Minsky, your reports"
         className="flex shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 max-lg:size-11 lg:-m-1 lg:w-fit lg:p-1"
       >
         <BrandMark wordClassName="max-lg:sr-only" />
-      </Link>
+      </ContestLink>
       <div className="min-w-0 leading-tight">
         <p
           className={cn(
@@ -193,7 +193,7 @@ export function ContestantTopBar({
                 afterClose.current = () => undefined;
               }}
             >
-              <Link to="/account">My account</Link>
+              <ContestLink to="/account">My account</ContestLink>
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {

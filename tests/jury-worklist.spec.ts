@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { snapshotSchema } from "../src/connected/model";
 import { appErrors } from "./support/worker";
+import { atPath } from "./support/address";
 import { expect, test } from "./support/localWorker";
 
 // Jury worklist checks for the organiser UIs. The phone Awards
@@ -58,7 +59,7 @@ async function openAwards(page: Page) {
       page.getByRole("heading", { level: 1, name: "Award review" }),
     ).toBeFocused();
   }
-  await expect(page).toHaveURL("/jury");
+  await expect(page).toHaveURL(atPath("/jury"));
 }
 
 /** The button of an award list, whose text ends with its count. */
@@ -321,6 +322,47 @@ test("jury-only members record an explicit zero and can confirm a reopened issue
   ).toBe("claimed");
 });
 
+test("jury withdraws a pending award by keyboard at phone width, and the issue takes no other award", async ({
+  page,
+  local,
+}) => {
+  await login(page, "jury", { width: 320, height: 720 });
+  await openAwards(page);
+  await row(page, 1).getByRole("button", { name: "Decide award" }).click();
+  const award = sheet(page, "Decide award");
+  await chooseMinutes(award, 5);
+  await award.getByLabel("Public award explanation").fill("Judge outage.");
+  await award.getByRole("button", { name: /^Record/ }).click();
+  await expect(award).toHaveCount(0);
+  const receipt = page.getByRole("region", { name: "Time award" });
+  await expect(receipt).toContainText("Pending external application");
+
+  await page.getByRole("button", { name: "More actions" }).click();
+  await sheet(page, "More actions").getByRole("button", { name: /^Withdraw award/ }).click();
+  const withdraw = sheet(page, "Withdraw award");
+  const submit = withdraw.getByRole("button", { name: "Withdraw award", exact: true });
+  await expect(submit).toBeDisabled();
+  const confirm = withdraw.getByRole("checkbox");
+  await confirm.focus();
+  await page.keyboard.press("Space");
+  await expect(confirm).toBeChecked();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.keyboard.press("Tab");
+  await expect(submit).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(withdraw).toHaveCount(0);
+  await expect(receipt).toContainText("Withdrawn · gives no time");
+  await expect(receipt).toContainText("This issue cannot take another award.");
+  await expect(page.getByRole("button", { name: /^(Decide award|Confirm applied)$/ })).toHaveCount(0);
+  await page.setViewportSize(phone);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  const stored = (await local.snapshot()).awards.find((item) => item.issue_id === local.issues[0]);
+  expect(stored).toMatchObject({ applied_at: null, withdrawn_at: expect.any(String) });
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expectCounts(page, { decide: 1, apply: 2, done: 1 });
+});
+
 test("staff read one-minute and zero awards in plain words", async ({
   page,
   local,
@@ -381,8 +423,9 @@ test("the admin overview reads a one-minute total in the singular", async ({
   local,
 }) => {
   await local.run(
-    "UPDATE awards SET minutes = CASE WHEN issue_id = ? THEN 1 ELSE 0 END",
+    "UPDATE awards SET minutes = CASE WHEN issue_id = ? THEN 1 ELSE 0 END WHERE session_id = ?",
     local.issues[3]!,
+    local.sessions[0],
   );
   await login(page, "admin", desktop);
   await consolePages(page).getByRole("button", { name: "Overview" }).click();
@@ -716,7 +759,7 @@ test("session and role changes clear selection and do not grant other roles a ju
   // The award form closes because the person can no longer decide awards.
   await expect(sheet(page, "Decide award")).toHaveCount(0);
   await expect(page.getByLabel("Public award explanation")).toHaveCount(0);
-  await expect(page).toHaveURL("/issues");
+  await expect(page).toHaveURL(atPath("/issues"));
   await expect(
     page.getByRole("heading", { level: 1, name: "Queue", exact: true }),
   ).toBeFocused();

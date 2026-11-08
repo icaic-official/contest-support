@@ -132,7 +132,7 @@ A token that can create tokens can grant itself any permission. So these rules a
 - Prevent repeated actions from creating duplicate awards or invalid transitions.
 - Use isolated verification fixtures.
 - Delete only records that belong to those fixtures.
-- Do not expose a shared-data reset or persona impersonation control in the connected product.
+- Do not expose a shared-data reset or persona impersonation control in the connected product. The deletion of one named event through its journal is not a shared-data reset.
 
 ## Git workflow
 
@@ -260,7 +260,7 @@ Require temporary-password changes at the database boundary. Personal email and 
 Staff can attach JPEG, PNG, and WebP images while the event is active.
 The uploader chooses team visibility or staff-only visibility. That choice stays fixed.
 Only the uploader can remove a ready image during that time.
-Session admins set the file size, image count, and combined size limits. There is no upload-disable control.
+Contest admins set the file size, image count, and combined size limits. There is no upload-disable control.
 Contestants can view only team-visible images on their own team's issues.
 
 Cloudflare is the only provider implementation. Test D1 rules and transactions with local D1 emulation.

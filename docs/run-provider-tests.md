@@ -68,6 +68,7 @@ A passing run exits with code zero after all 11 cases and cleanup.
 Cleanup verifies the owned D1 records, exact R2 keys, and Durable Object state before deleting the identifiers-only journal.
 The selected Worker must expose the trusted `SessionMaintenance` service entrypoint.
 The fixture checks that internal binding before it creates records. It does not use a public setup or cleanup route.
+Cleanup posts the fixture's event ID to that binding after the rows step. The binding erases only the contests that the event's deletion journal names.
 Do not enable credential-bearing traces, screenshots, video, or request debug logs.
 
 ## Check the complete Cloudflare runtime separately
@@ -91,6 +92,7 @@ npm run test:connector:ui:local
 
 This command builds a separate Cloudflare frontend without replacing the default `dist` output.
 It uses the same UI assertions as the guarded hosted journey, with separate local fixture setup.
+After the journey, the local run also checks the redirects of a person with several contests, because only a production build shows their race with the contest address effect. The hosted journey does not run that step.
 It accepts no targets or filters and deletes its temporary build, bindings, and browser artifacts afterward.
 Local emulation does not replace hosted Cloudflare checks.
 

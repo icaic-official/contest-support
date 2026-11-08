@@ -81,6 +81,8 @@ function award(overrides: Partial<Award> = {}): Award {
     at: "2026-10-17T10:20:00Z",
     applied_at: null,
     applied_name: null,
+    withdrawn_at: null,
+    withdrawn_name: null,
     ...overrides,
   };
 }

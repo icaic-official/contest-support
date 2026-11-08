@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import type { D1Connection, D1Value } from './connection';
+import { removeFixtureEvent } from '../cloudflare/eventDeletionFixture';
 import { applyMigrations } from './testFixture';
 
 const configPath = 'src/server/adapters/cloudflare/deploy/connector-store-ci.wrangler.jsonc';
@@ -150,15 +151,11 @@ describe('the previous Worker on the scoped authority schema', () => {
       expect(await writer(db).all(previousWorker.signInSql, 'crossing')).toHaveLength(1);
     });
 
-    it('deletes an event and its accounts in one batch, but never leaves an account without its event', async () => {
+    it('never leaves an account without its event, and the deletion journal removes both', async () => {
       const { first, run } = writer(db);
-      // The key is checked at commit. Local D1 then reports an internal error, not the constraint name.
-      await expect(run('DELETE FROM events WHERE id = ?', ids.other)).rejects.toThrow();
+      await expect(run('DELETE FROM events WHERE id = ?', ids.other)).rejects.toThrow(/deleted only through its deletion record/);
       expect(await first('SELECT event_id FROM accounts WHERE id = ?', ids.otherStaff)).toEqual({ event_id: ids.other });
-      await db.batch([
-        db.prepare('DELETE FROM events WHERE id = ?').bind(ids.other),
-        db.prepare('DELETE FROM accounts WHERE id = ?').bind(ids.otherStaff),
-      ]);
+      await removeFixtureEvent(db, ids.other);
       expect(await first('SELECT id FROM events WHERE id = ?', ids.other)).toBeNull();
       expect(await first('SELECT id FROM accounts WHERE id = ?', ids.otherStaff)).toBeNull();
     });

@@ -78,7 +78,7 @@ These commands run without cloud credentials:
 | `npm run preview` | Serve the built assets. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm run lint` | Run ESLint. |
-| `npm test` | Run unit and script tests. |
+| `npm test` | Run unit and script tests. Local D1 keeps its files in `/dev/shm` when `TMPDIR` is unset and `/dev/shm` has 512 MiB free, so commits do not wait for the disk. |
 | `npm run ci` | Run the complete CI check: installs, types, lint, tests, both builds, audits, and the Gitleaks scan. Needs Node.js 22.23.4 or later for the docs build. |
 | `npm run test:d1` | Run every D1 workflow case on local emulation. |
 | `npm run test:auth` | Run account and permission tests on local D1. |
@@ -93,6 +93,7 @@ These commands run without cloud credentials:
 | `npm run perf:reads` | Count D1 calls and rows for each API request, on a temporary local database. Add `-- --plan=base`, `-- --explain`, or `-- --out=<file.json>`. Compare saved records with `node scripts/compare-read-volume.mjs --base=<files> --head=<files>`. |
 | `npm run perf:client` | Measure first load, heap, renders, and snapshot reads with a 500-issue queue. Set `PERF_RUNS` and `PERF_OUT=<file.json>`. |
 | `npm run perf:size` | Print the raw, gzip, and Brotli size of each file in `dist/assets`. |
+| `npm run perf:deletion` | Time the fence and rows step of a 2,000-issue event with 80,000 history rows and 140,000 outbox rows beside an equally large event, on a temporary local database. A failure or an interrupt removes the seeded rows. |
 | `npm run docs:dev` | Start the documentation site. Needs Node.js 22.23.4 or later and `npm ci --prefix site`. |
 | `npm run docs:build` | Build the site and check its local links and anchors. |
 | `npm run docs:preview` | Serve the built site, including search. |
@@ -109,6 +110,7 @@ These commands connect to a Cloudflare account. Several of them change hosted da
 | `npm run cloudflare:recover-admin -- --config <file> --username <name>` | Reset a webmaster password in the remote `DB` database that the Wrangler file names. Prints the temporary password once. See [the recovery procedure](site/src/content/docs/operators/installation.mdx#recover-a-webmaster-password). |
 | `npm run cloud:hosting-login` | Sign in to Cloudflare with Wrangler. |
 | `npm run load -- <command>` | Run a [load test](docs/run-load-tests.md) against an isolated installation: `site`, `setup`, `run`, `analytics`, and `cleanup`. |
+| `npm run perf:deletion -- --remote --database=<name>` | Time the same deletion on a hosted database whose name starts with `minsky-preview`. Add `--cleanup=<run>` to remove what an earlier run left. |
 
 These commands work only with the maintainers' own Cloudflare account. The hosted suites refuse any other target:
 

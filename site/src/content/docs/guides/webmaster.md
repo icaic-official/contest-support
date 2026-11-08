@@ -1,82 +1,124 @@
 ---
-title: Run the site
-description: Sign in as a webmaster, create events, manage webmasters, and control webmaster access to contest data.
+title: Run the site as a webmaster
+description: Sign in as a webmaster, manage webmasters, create events, give an event its admins, and delete an event permanently.
 ---
 
-A webmaster runs the whole site and belongs to no event.
-A webmaster can also do everything that an event admin and a contest admin can do.
+A webmaster runs the whole Minsky site. A webmaster belongs to no event and can do everything that an event admin can do in every event.
+This guide is for webmasters. To build the contests, people, and teams of one event, see [Run an event](/guides/event-admin/).
 
-## Open the Site page
+## Before you start
 
-1. On the sign-in page, select **Site sign-in**. This form asks for no event code.
-2. Enter your username and password, and select **Sign in**.
+You need these items:
 
-If you can open no contest, Minsky opens the **Site** page for you.
-Otherwise, select **Site** in the console sidebar or on the **Session** tab of a phone, or go to `/site`.
+- The address of your Minsky site, for example `https://minsky.example/`.
+- A webmaster username and a temporary password. The operator who installed Minsky creates the first webmaster. See [Create the first webmaster](/operators/installation/#6-create-the-first-webmaster). A webmaster creates the others.
 
-The page lists the events, the webmasters, and the site setting. A calendar shows the contests of every event.
+## Sign in
+
+1. Open the site address, and select **Sign in**.
+2. On the sign-in form, select **Site sign-in**. This form asks for no event code.
+3. Enter your username and password, and select **Sign in**.
+4. If the password is temporary, set a new password.
+
+Minsky opens one of these pages:
+
+- If you cannot read any contest yet, Minsky opens the **Site** page (`/site`).
+- Otherwise Minsky opens the issue queue (`/issues`). To go to the **Site** page, select **Site** in the console sidebar, or in the **Session** tab on a phone. You can also type `/site` after the site address.
+
+The **Site** page shows a calendar of the contests of every event, the **Events** list, any **Deletions**, the **Webmasters** list, and the **Site setting**.
+The header shows **Your time**, which is the clock and time zone of your own device. Each event uses its own time zone.
 
 ## Create an event
 
-Choose the event's name, code, and time zone with care. No screen can change them after you create the event.
+Each event has one event code. People type the code, or open a link that holds it, to sign in. Choose a short code that people can read aloud.
 
-1. Select **Create event**.
-2. Enter the **Event name**.
-3. Enter the **Event code**. It has 3 to 40 lowercase letters, digits, or hyphens, and starts with a letter or digit. People type it when they open the plain sign-in page, so choose a code that is short and that people can read aloud.
-4. Enter the **Time zone**, for example `Asia/Singapore`. The field starts with your device's zone. Every contest of the event uses this zone.
-5. Enter **First event admin, name** and **First event admin, username**.
-6. Select **Create event**.
-7. Give the sign-in link, the username, and the temporary password to the event admin in person. Minsky shows the password once.
+1. On the **Site** page, select **Create event**.
+2. Fill in the form:
+	- **Event name**. At most 200 characters.
+	- **Event code**. 3 to 40 lowercase letters, digits, or hyphens. It starts with a letter or a digit. Minsky changes capital letters to lowercase. Two events cannot have the same code.
+	- **Time zone**. The form suggests your own zone. Choose a zone from the list, for example `Asia/Singapore`. Contest times show in this zone.
+	- **First event admin, name** and **First event admin, username**. The username is 3 to 32 letters, digits, hyphens, or underscores, and starts with a letter or a digit.
+3. Select **Create event**.
 
-If the password does not arrive, the page says so. Select **Open console**, then **People**, then **Issue password** beside that person.
+Minsky creates the event and the event admin's account, and shows **First event admin of** the event name. The dialog shows the sign-in link, the username, and the temporary password once. Give them to the event admin in person.
 
-The event admin then [sets up the event](/guides/event-admin/).
-To do that work yourself, select **Open console** on the event.
+If a line under the **Events** list says that the event exists but its first admin has no password yet, select **Open console**. On the **People** tab, select **Issue password** for that admin.
 
-## Add a webmaster
+You cannot change the name, the code, or the time zone of an event after you create it.
 
-1. Under **Webmasters**, select **Add**.
-2. Enter the **Name** and the **Username**.
+## Give an event more event admins
+
+An event admin is a staff account of the event that can change everything in that event.
+
+1. On the **Site** page, select **Open console** on the event.
+2. On the **People** tab, create the person if the person has no account. See [Add people](/guides/event-admin/#add-people).
+3. Switch on **Event admin** for that person.
+
+To take event admin authority away, switch **Event admin** off. Minsky does not stop you from removing the last event admin of an event. You can always give the authority again from the event console.
+
+You can open any event console and do everything that an event admin can do there. For example, reset the password of an event admin who cannot sign in. See [Recover a password](/guides/event-admin/#recover-a-password).
+
+## Manage webmasters
+
+Use the **Webmasters** list on the **Site** page.
+
+To add a webmaster:
+
+1. Select **Add**.
+2. Enter the **Name** and a **Username**. The username follows the same rule as other usernames. No other webmaster can have it.
 3. Select **Add webmaster**.
-4. Give the sign-in page, the username, and the temporary password to the new webmaster in person. The new webmaster selects **Site sign-in** on that page.
 
-A webmaster who shows **Needs a password** has no password yet. Select **Issue password** beside that webmaster.
+The dialog **Webmaster password** shows the new temporary password once. Give it to the webmaster in person.
+If the password was not issued, the row shows **Needs a password**. Select **Issue password** on that row. If the password was issued but the page did not receive it, a line asks you to reset it. Use the key button on that row.
 
-## Reset a webmaster password
+To reset the password of another webmaster, select the key button on that row, then **Reset password**. The old password stops working, and every open session of that webmaster ends. You cannot reset your own password here.
 
-1. Select the key button beside the webmaster.
-2. Select **Reset password** in the dialog. The current password stops working, and every open session of that webmaster ends.
-3. Give the new temporary password to the webmaster in person.
+To remove a webmaster, select the remove button on that row, then **Remove**. The person loses site authority, and every open session of that person ends. The account stays. If you remove yourself, you stay signed in, but you lose the **Site** page.
 
-You cannot reset your own password here. Use **Change password** on your account page.
-If no webmaster can sign in, an operator follows [Recover a webmaster password](/operators/installation/#recover-a-webmaster-password).
+Minsky refuses these removals:
 
-## Remove a webmaster
+- The removal of the last webmaster. The message is "The last webmaster cannot be removed."
+- Your own removal, when no other webmaster has a password. Issue a password to another webmaster first.
 
-1. Select the remove button beside the webmaster.
-2. Select **Remove** in the dialog.
+## Read contest data
 
-The person loses site authority, and every open session of that person ends. If you remove yourself, you lose site authority and stay signed in.
-Minsky refuses to remove the last webmaster.
+The **Site setting** card has one switch, **Webmasters read contest data only after joining**.
 
-## Control webmaster access to contest data
+- **Off.** You read the issues and notes of every contest at once.
+- **On.** You must join a contest before you read its issues and notes. The card **Contests to join** lists them. Select **Join** on a contest. The admins of that contest see your join in their audit.
 
-By default, a webmaster can read every contest at once.
-To change this, switch on **Webmasters read contest data only after joining**.
+The setting covers contest data only. While it is on, you can still manage accounts and schedules in an event console without a join.
 
-While the setting is on, a webmaster joins a contest before reading its issues and notes:
+## Delete an event permanently
 
-1. Under **Contests to join**, select **Join** beside the contest.
-2. Minsky opens the contest.
+Delete an event only when nobody needs its records. You cannot undo the deletion.
 
-The contest's admins see the join in **Recent administration activity**. The entry reads "Joined to read this contest" and names "A webmaster" when that webmaster holds no seat in the contest.
+The deletion removes these items:
 
-## What the site does not do
+- Every contest and every account of the event.
+- Every issue, reply, note, award, image, and announcement of the event.
 
-These actions have no control in Minsky:
+It also signs out everyone in the event at once and stops a running contest. Only the name and the code of the event stay, in the site record.
 
-- Delete an event.
-- Archive an event.
-- Change an event's name, code, or time zone.
+1. On the **Site** page, find the event in the **Events** list and select **Delete event**.
+2. Read the dialog. It names the number of contests and accounts that go.
+3. Type the event name exactly as it shows. For an event with no name, type its event code.
+4. Select **Delete event**. The button stays unavailable until the text matches.
 
-See [feature status](/reference/status/) for other limits.
+The event leaves the **Events** list. Its progress shows under **Deletions**:
+
+| Label | Meaning |
+| --- | --- |
+| **Deleting contests and accounts** | Minsky removes the records. The detail counts what is left. |
+| **Closing live updates** | Minsky closes the live connections of each contest. |
+| **Waiting for the final file check** | The records are gone. An upload that was in progress can still finish, so Minsky waits about an hour before the last file check. |
+| **Removing files** | Minsky removes the images of the event. |
+| **Deleted** | The deletion is complete. The record stays with the event code, who asked, and when. |
+| **Stopped** | An account of the event also has activity in another event. Minsky keeps that account and tries again every hour. |
+
+If a deletion shows **Stopped**, read [the operator steps for a stopped deletion](/operators/installation/#repair-an-event-deletion). Do not delete records by hand.
+
+## Recover webmaster access
+
+If you forget your password, ask another webmaster to reset it on the **Site** page.
+If no webmaster can sign in, an operator runs `npm run cloudflare:recover-admin`. See [Recover the webmaster](/operators/installation/#recover-a-webmaster-password).

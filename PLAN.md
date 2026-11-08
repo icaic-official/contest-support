@@ -12,7 +12,7 @@ The [documentation release plan](docs/documentation-release-plan.md) lists the w
 The contestant app is one responsive app. [Product direction](docs/product-direction.md) states its behavior.
 
 **Webmaster, event, and contest platform, 2026-10-27.** The owner settled GitHub issues #119 and #136 and answered the open questions of the design that followed.
-The [event platform design](docs/event-platform-design.md) explains the implementation. Phases 1 to 6 are merged. Phases 7 and 8 are not started.
+The [event platform design](docs/event-platform-design.md) explains the implementation. All eight phases are merged.
 
 1. Minsky stays a contest support desk. It gets no problems, submissions, judging, or scoreboard.
 2. One shared installation, with one Worker and one D1 database, hosts the events of many organizers for free. Self-hosters run the same code. The owner will revisit the system design for scale later.

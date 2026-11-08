@@ -97,7 +97,8 @@ It checks D1 cleanup counts, R2 object absence, and Durable Object cursor and al
 It deletes exact object keys without a bucket-wide list or prefix deletion.
 The Cloudflare fixture uses the named `SessionMaintenance` service entrypoint through trusted account access.
 The public application has no maintenance route.
-Cleanup first proves fixture ownership and blocks late live messages. It then removes owned D1 rows and verifies empty coordinator storage.
+Cleanup first proves fixture ownership and fences the event through the deletion journal.
+It then runs the rows step, and each contest's coordinator verifies its own empty storage.
 An interrupted cleanup retains its identifiers-only journal for retry.
 
 A cleanup failure fails the run and retains the journal on the machine that ran the tests. The runner prints its path.

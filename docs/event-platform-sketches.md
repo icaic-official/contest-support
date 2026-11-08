@@ -863,6 +863,7 @@ export function formatInZone(instant: Instant, timeZone: string, style: 'time' |
 }
 
 // =================================================================================================
+// Phase 7 is built. The code in src/server/adapters/cloudflare/eventDeletion.ts supersedes this sketch.
 // src/server/adapters/cloudflare/eventDeletion.ts  (new; replaces fixture-only cleanup in
 // src/server/adapters/cloudflare/live.ts:245-285, src/server/adapters/cloudflare/live.ts:365-387 and the order in tests/providers/cloudflare/fixture.ts:342-407)
 // =================================================================================================
@@ -1083,7 +1084,7 @@ export function recoverWebmaster(db: D1Connection, input: { handle: string }):
 
 ## Migration sketch
 
-This SQL file is a sketch of D1 migrations `0017` to `0024`, with a marker line before each file, and no migration in the repository holds it yet.
+This SQL file is a sketch of D1 migrations `0017` to `0024`, with a marker line before each file. The repository migrations `0017` to `0024` implement it, and where they differ, the repository files are authoritative.
 
 ```sql
 -- D1 migration sketch for the webmaster, event, and contest platform. Not implemented.
@@ -1741,6 +1742,8 @@ END;
 
 
 -- ==== 0023_event_deletion.sql (Phase 7) additive: yes ====
+-- Built. src/server/adapters/d1/migrations/0023_event_deletion.sql supersedes this sketch,
+-- and the design page lists the differences. foreignKeyIndexes.test.ts derives the index list.
 -- A deletion journal that survives the cascade, plus indexes that keep the cascade and the
 -- account deletes from scanning other events' rows. The guards that make the journal the only
 -- way to delete come in 0024, one release later, so that the previous release's test cleanup

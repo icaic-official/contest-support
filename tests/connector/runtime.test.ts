@@ -13,6 +13,7 @@ import { bootstrapSite } from '../../src/server/adapters/cloudflare/installation
 import { loginKeyFor } from '../../src/server/adapters/cloudflare/credentials';
 import { randomSecret } from '../../src/server/adapters/cloudflare/password';
 import { avatarKey } from '../../src/server/adapters/cloudflare/avatars';
+import { removeFixtureEvent } from '../../src/server/adapters/cloudflare/eventDeletionFixture';
 import type { IssuedCredential, ManageCommand, ManageReceipt, PersonAvatar, StartedImage } from '../../src/backend/contracts';
 
 const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7t0AAAAASUVORK5CYII=', 'base64');
@@ -268,11 +269,8 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
       await setup.env.DB.batch([
         setup.env.DB.prepare('INSERT INTO events (id, name) VALUES (?, ?)').bind(sentinel.event, sentinel.name),
         setup.env.DB.prepare('INSERT INTO accounts (id, name) VALUES (?, ?)').bind(sentinel.account, sentinel.name),
-        // D1 keeps the last webmaster. The sentinel is the shared site's other
-        // webmaster, so cleanup can delete the webmaster that bootstrap made.
-        setup.env.DB.prepare(`INSERT INTO grants (account_id, scope, granted_by) VALUES (?, 'site', 'fixture')`).bind(sentinel.account),
         setup.env.DB.prepare('INSERT INTO authentication_limits (key, window_start, attempts) VALUES (?, unixepoch(), 1)').bind(sentinelLimit),
-        setup.env.DB.prepare('INSERT INTO accounts (id, name) VALUES (?, ?)').bind(legacyId, `Fictional unconfigured ${unique}`),
+        setup.env.DB.prepare('INSERT INTO accounts (id, name, event_id) VALUES (?, ?, ?)').bind(legacyId, `Fictional unconfigured ${unique}`, fixture.event),
         setup.env.DB.prepare('INSERT INTO memberships (session_id, account_id) VALUES (?, ?)').bind(fixture.session, legacyId),
         setup.env.DB.prepare("INSERT INTO membership_roles (session_id, account_id, role) VALUES (?, ?, 'volunteer')").bind(fixture.session, legacyId),
       ]);
@@ -450,25 +448,27 @@ it('runs the complete application through isolated HTTPS, D1, R2, and Durable Ob
         const ownedLimits = limits.results.filter(({ key }) => fixtureIpKeys.includes(key) ||
           ownedAccounts.some((id) => key === `change:${id}`) ||
           usernames.some((username) => [`handle:${fixture.event}:${username}`, `handle:site:${username}`].includes(key)));
-        await db.batch([
-          db.prepare('DELETE FROM events WHERE id = ? AND name = ?').bind(fixture.event, `runtime:${unique}`),
-          ...ownedAccounts.map((id) => db.prepare('DELETE FROM authority_audit WHERE actor = ?').bind(id)),
-          ...ownedAccounts.map((id) => db.prepare('DELETE FROM account_operations WHERE account_id = ?').bind(id)),
-          ...ownedAccounts.map((id) => db.prepare('DELETE FROM ba_user WHERE id = ?').bind(id)),
-          ...ownedAccounts.map((id) => db.prepare('DELETE FROM account_avatars WHERE account_id = ?').bind(id)),
-          ...ownedAccounts.map((id) => db.prepare('DELETE FROM accounts WHERE id = ?').bind(id)),
-          ...ownedLimits.map(({ key }) => db.prepare('DELETE FROM authentication_limits WHERE key = ?').bind(key)),
-        ]);
-        const accounts = await db.prepare('SELECT id, name FROM accounts').all<{ id: string; name: string }>();
+        await removeFixtureEvent(db, fixture.event);
+        await db.batch(ownedLimits.map(({ key }) => db.prepare('DELETE FROM authentication_limits WHERE key = ?').bind(key)));
+        // The webmaster that bootstrap made has no event, so it stays with its login, audit, and receipts.
+        // This local database is temporary.
+        const site = installation.accountId;
+        const accounts = await db.prepare('SELECT id FROM accounts WHERE id <> ?').bind(site).all<{ id: string }>();
         const events = await db.prepare('SELECT id, name FROM events').all<{ id: string; name: string }>();
-        expect(accounts.results).toEqual([{ id: sentinel.account, name: sentinel.name }]);
+        expect(accounts.results).toEqual([{ id: sentinel.account }]);
         expect(events.results).toEqual([{ id: sentinel.event, name: sentinel.name }]);
         const tables = ['entrants', 'authority_audit', 'manage_receipts', 'sessions', 'teams', 'memberships', 'membership_roles', 'logins', 'ba_user', 'ba_session', 'ba_account',
           'ba_verification', 'issues', 'history', 'resolutions', 'awards', 'issue_images', 'image_deletions', 'command_receipts',
           'audience_sequences', 'notifications', 'admin_audit', 'account_operations', 'command_assertions', 'workflow_commit_times', 'session_issue_sequences',
           'account_avatars'];
+        const siteRows: Record<string, string> = {
+          authority_audit: 'event_id IS NULL', manage_receipts: 'actor = ?', logins: 'account_id = ?',
+          ba_user: 'id = ?', ba_session: 'userId = ?', ba_account: 'userId = ?', account_operations: 'account_id = ?',
+        };
         for (const table of tables) {
-          const count = await db.prepare(`SELECT count(*) AS count FROM ${table}`).first<{ count: number }>();
+          const keep = siteRows[table];
+          const count = await db.prepare(`SELECT count(*) AS count FROM ${table}${keep ? ` WHERE NOT (${keep})` : ''}`)
+            .bind(...(keep?.includes('?') ? [site] : [])).first<{ count: number }>();
           expect(count?.count, `Scoped cleanup must remove fixture records from ${table}.`).toBe(0);
         }
         expect((await db.prepare('SELECT key FROM authentication_limits').all<{ key: string }>()).results).toEqual([{ key: sentinelLimit }]);

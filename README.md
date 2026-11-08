@@ -8,7 +8,7 @@ Minsky runs on Cloudflare Workers, D1, R2, and Durable Objects. One installation
 
 **Project status.** Minsky is in development.
 No production installation exists, and it has not been verified in a live contest or at its target of 800 simultaneous users.
-It needs a network connection. No license has been chosen yet, so the code is not yet open for reuse.
+It needs a network connection. The code uses the Apache License 2.0, and the documentation uses CC BY 4.0. See [License](#license).
 [Feature status](site/src/content/docs/reference/status.md) lists what works and what is not built.
 
 ## What Minsky does
@@ -154,4 +154,6 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 
 ## License
 
-No license has been chosen yet. Until one is added, the default copyright rules apply.
+The code is licensed under the [Apache License 2.0](LICENSE).
+
+The documentation is licensed under [Creative Commons Attribution 4.0 International](LICENSE-docs) (CC BY 4.0). The documentation is the content of `docs/` and `site/src/content/docs/`, and the Markdown files at the root of the repository. You can copy and change it if you give credit to the Minsky contributors and state your changes.

@@ -123,7 +123,7 @@ export function notificationStatements(db: D1Connection, sessionId: string, audi
   ]);
 }
 
-const contestColumns = (extraSql: string) => `c.session_id AS id, c.session_name AS name, c.event_id, c.manage, e.name AS event_name, e.time_zone,
+const contestColumns = (extraSql: string, row = 'c') => `${row}.session_id AS id, ${row}.session_name AS name, ${row}.event_id, ${row}.manage, e.name AS event_name, e.time_zone,
   s.contest_type, s.starts_at, s.ends_at, s.grace_minutes, s.intake_follows_schedule, s.intake_open,
   ${intakeStateSql('s', extraSql)} AS intake`;
 
@@ -136,8 +136,8 @@ const contestColumns = (extraSql: string) => `c.session_id AS id, c.session_name
 export const contestsListSql = `WITH viewer AS MATERIALIZED (SELECT c.session_id, c.session_name, c.event_id, c.manage,
     ${viewerExtraSql('s', 'c.team_id')} AS extra
     FROM (${contestDataSql('contests')}) c JOIN sessions s ON s.id = c.session_id)
-  SELECT ${contestColumns('c.extra')}, 1 AS can_open FROM viewer c
-  JOIN sessions s ON s.id = c.session_id JOIN events e ON e.id = s.event_id ORDER BY c.session_name, c.session_id`;
+  SELECT ${contestColumns('v.extra', 'v')}, 1 AS can_open FROM viewer v
+  JOIN sessions s ON s.id = v.session_id JOIN events e ON e.id = s.event_id ORDER BY v.session_name, v.session_id`;
 
 /**
  * The contests of one event that the caller can open, with the intake of the

@@ -22,7 +22,7 @@ import { SignIn } from "@/screens/SignIn";
 import { useAccountStatus } from "./hooks/useAccountStatus";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { searchWithoutContest } from "./navigation";
-import { setTabSignedOut, startVisit, tabSignedOut } from "./tabSignOut";
+import { setTabSignedOut, tabSignedOut } from "./tabSignOut";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
 
@@ -77,10 +77,10 @@ export function ConnectedApp() {
   // sign-out to the next sign-in, no address that this tab shows keeps it, so
   // the next person starts from the default contest. That covers the entries
   // that the browser returns to after the sign-out: a phone screen above the
-  // home goes back one entry when it unmounts, and Back reaches the rest, also
-  // after a reload. A link that the person opens is a new visit, and keeps its
-  // contest, also in a tab that signed out.
-  useEffect(startVisit, []);
+  // home goes back one entry when it unmounts, and Back reaches the rest. Only
+  // a sign-in ends the state. A reload or a new page load does not, because
+  // Back loads the older entries as page loads too. A tab that never signed in
+  // keeps the contest of a shared link.
   const wasSignedIn = useRef(false);
   useEffect(() => {
     if (auth.loading) return;

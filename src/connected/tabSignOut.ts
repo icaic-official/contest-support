@@ -24,14 +24,3 @@ export function setTabSignedOut(signedOut: boolean): void {
     // Without storage, the page keeps the state, and a reload forgets it. Back can then show an older address that names a contest.
   }
 }
-
-/**
- * Ends the sign-out of the tab when the person started this page load, by a
- * link, the address bar or a bookmark. That is a new visit, so the contest in
- * its address is the person's own. A reload and a step through history also
- * load the page, but they return to an address that an earlier visit made.
- */
-export function startVisit(): void {
-  const [entry] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
-  if (entry?.type === "navigate") setTabSignedOut(false);
-}

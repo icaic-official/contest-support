@@ -46,6 +46,8 @@ const award: Snapshot["awards"][number] = {
   at: "2026-10-17T10:30:00Z",
   applied_at: null,
   applied_name: null,
+  withdrawn_at: null,
+  withdrawn_name: null,
 };
 
 function entry(text: string, at = "2026-10-17T10:05:00Z") {

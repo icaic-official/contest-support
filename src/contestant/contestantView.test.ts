@@ -94,6 +94,8 @@ const award = {
   at: "2026-10-17T10:30:00Z",
   applied_at: null,
   applied_name: null,
+  withdrawn_at: null,
+  withdrawn_name: null,
 };
 
 const time = (value: string) => value.slice(11, 16);

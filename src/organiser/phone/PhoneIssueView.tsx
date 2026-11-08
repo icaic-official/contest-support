@@ -11,6 +11,7 @@ import {
   MessageSquarePlus,
   RotateCcw,
   Scale,
+  Undo2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { ActionSheet, CommandFeedback } from "../actions/ActionSheet";
 import {
   ApplyForm,
   AwardForm,
+  WithdrawAwardForm,
   EscalateForm,
   ReopenForm,
   type ReplyDraft,
@@ -59,6 +61,7 @@ const sheetTitles: Record<
       "Staff confirm separately when it is applied in the contest system.",
   },
   apply: { title: "Confirm external application" },
+  withdraw: { title: "Withdraw award" },
   more: { title: "More actions" },
 };
 
@@ -181,6 +184,17 @@ export function PhoneIssueView({
         icon={<CheckCheck aria-hidden="true" className="size-5" />}
         label="Confirm applied externally"
         onSelect={() => setSheet("apply")}
+      />,
+    );
+  }
+  if (can.withdraw) {
+    moreItems.push(
+      <MoreItem
+        key="withdraw"
+        icon={<Undo2 aria-hidden="true" className="size-5" />}
+        label="Withdraw award"
+        help="Only before staff confirm it. The award stays in the record."
+        onSelect={() => setSheet("withdraw")}
       />,
     );
   }
@@ -312,6 +326,8 @@ export function PhoneIssueView({
         return <AwardForm {...formProps} />;
       case "apply":
         return <ApplyForm {...formProps} />;
+      case "withdraw":
+        return <WithdrawAwardForm {...formProps} />;
       case "more":
         return (
           <ul className="divide-y rounded-xl border">{moreItems}</ul>

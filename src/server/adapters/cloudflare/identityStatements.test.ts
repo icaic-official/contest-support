@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Binding, D1Connection, D1Statement } from '../d1/connection';
 import type { LoginKey } from '../../../backend/contracts';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { createBetterAuthIdentity, sharedBetterAuthIdentity } from './identity';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
 // The maintained scrypt hasher takes about 100 ms per password. A fast
@@ -66,9 +66,7 @@ describe('Better Auth work per request with real local D1', () => {
   let eventCode = '';
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);

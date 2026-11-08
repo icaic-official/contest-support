@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Request } from "@playwright/test";
 import { contrastOf } from "./support/contrast";
 import { addContestAt, addLaterContest, confirmExtraTime, endRunningContest, seatThreeContests } from "./support/contests";
 import { type LocalWorker, expect, test } from "./support/localWorker";
@@ -248,24 +248,26 @@ test.describe("a contestant with several contests", () => {
     const ids = await three(local);
     await signIn(page);
     await at(page, "/issues", ids.running);
-    let held = 0;
+    const held: Request[] = [];
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => (release = resolve));
     await page.route("**/api/contests*", async (route) => {
-      if (held++ === 0) await gate;
+      if (held.length === 0) {
+        held.push(route.request());
+        await gate;
+      }
       await route.fallback();
     });
     const reads = await watchReads(page);
     await focusEvent(page);
-    await expect.poll(() => held).toBeGreaterThan(0);
+    await expect.poll(() => held.length).toBe(1);
     await trigger(page).click();
     await page.getByRole("menuitemradio", { name: /^Alpha/ }).click();
     await expect(triggerFor(page, "Alpha")).toBeVisible();
     await expect(page.getByText("Loading your contest session…")).toBeHidden();
     const before = reads.snapshots.length;
-    const stale = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/contests");
     release();
-    await (await stale).finished();
+    await (await held[0]?.response())?.finished();
     await settle(page);
     expect(reads.snapshots.slice(before)).not.toContain(ids.running);
     await expect(triggerFor(page, "Alpha")).toBeVisible();
@@ -287,7 +289,10 @@ test.describe("a contestant with several contests", () => {
     await expect(page.getByRole("heading", { name: "No reports yet" })).toBeVisible();
     await expect(page.getByText("Loading your contest session…")).toBeHidden();
     await at(page, "/issues", ids.next);
-    const stale = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/snapshot");
+    const stale = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/snapshot" && url.searchParams.get("sessionId") === ids.running;
+    });
     reads.release();
     await (await stale).finished();
     await settle(page);

@@ -11,7 +11,9 @@ function gate() {
 }
 
 /** Waits until every callback that is already pending has run. */
-const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+function flush() {
+  return new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
 
 /** True when `promise` settles without anything else happening first. */
 async function settles(promise: Promise<unknown>) {
@@ -115,16 +117,22 @@ describe("refresh queue", () => {
       await first.opened;
       log.push("read");
     });
-    const applied = queue.after(() => log.push("apply"));
+    const applied = queue.after(1, () => log.push("apply"));
     first.open();
     await applied;
     expect(log).toEqual(["read", "apply"]);
   });
 
+  it("runs work of a newer scope while a read of an older scope hangs", async () => {
+    const queue = createRefreshQueue();
+    void queue.read(1, () => gate().opened);
+    expect(await settles(queue.after(2, () => undefined))).toBe(true);
+  });
+
   it("keeps running after work throws", async () => {
     const queue = createRefreshQueue();
     await expect(
-      queue.after(() => {
+      queue.after(1, () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");

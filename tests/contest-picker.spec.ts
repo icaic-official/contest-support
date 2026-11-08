@@ -527,6 +527,20 @@ test.describe("a tab that signed out", () => {
     await nextPersonGetsTheDefault(page, ids.running);
   });
 
+  // A link that the person opens by a page load is a new visit, not a return to an older address.
+  test("keeps the contest of a link that the person opens after a sign-out", async ({ page, local }) => {
+    const ids = await three(local);
+    await signIn(page);
+    await signOut(page);
+    await page.goto(`/issues?contest=${ids.ended}`);
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await settle(page);
+    await at(page, "/issues", ids.ended);
+    await signInHere(page);
+    await expect(triggerFor(page, "Delta")).toBeVisible();
+    await at(page, "/issues", ids.ended);
+  });
+
   test.describe("on a phone", () => {
     test.use({ viewport: { width: 390, height: 844 } });
 

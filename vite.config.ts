@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { accessSync, constants, statfsSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import { BaseSequencer, type TestSpecification } from "vitest/node";
@@ -18,6 +19,22 @@ class SlowFirstSequencer extends BaseSequencer {
     return [...sorted.filter(slow), ...sorted.filter((file) => !slow(file))];
   }
 }
+
+// A local D1 database lives in SQLite files under the temp directory, and each commit writes to
+// that disk. A process that writes to the same disk slows the commits.
+// A full run holds about 50 MB at its peak, so use tmpfs only when this process can write to it
+// and it has 512 MiB free. A read-only mount has free space that no test can use.
+function memoryTempDirectory(): string | undefined {
+  if (process.env.TMPDIR) return undefined;
+  try {
+    accessSync("/dev/shm", constants.W_OK);
+    const { bavail, bsize } = statfsSync("/dev/shm");
+    return bavail * bsize >= 512 * 1024 * 1024 ? "/dev/shm" : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const tempDirectory = memoryTempDirectory();
 
 // The footer shows this commit. Workers Builds supplies it; a local build asks git.
 function buildId(): string {
@@ -51,9 +68,10 @@ export default defineConfig({
     // A slow Workers Builds runner can pass Vitest's 5 s default. Longer explicit limits still apply.
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    // Most test time waits on local Workers runtimes and password hashing.
-    // Use every CPU instead of Vitest's default of one fewer.
+    // Most test time waits on local Workers runtimes (each D1 call crosses the Wrangler
+    // proxy) and password hashing. Use every CPU instead of Vitest's default of one fewer.
     maxWorkers: "100%",
+    ...(tempDirectory ? { env: { TMPDIR: tempDirectory } } : {}),
     sequence: { sequencer: SlowFirstSequencer },
   },
 });

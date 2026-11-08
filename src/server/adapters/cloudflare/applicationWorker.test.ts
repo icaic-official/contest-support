@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Binding } from '../d1/connection';
 import { applyMigrations } from '../d1/testFixture';
 import applicationWorker, { type ApplicationEnvironment } from './applicationWorker';
 import { CLAIM_DELETION_SQL } from './eventDeletion';
 import { bootstrapSite } from './installation';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 vi.mock('cloudflare:workers', () => ({ WorkerEntrypoint: class {} }));
 
@@ -18,9 +18,7 @@ describe('full Worker installation boundary with real local D1', () => {
   let env: ApplicationEnvironment;
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Binding }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Binding }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);

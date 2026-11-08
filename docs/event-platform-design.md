@@ -757,7 +757,7 @@ The [type sketch](event-platform-sketches.md#type-sketch) shows the final shape.
    - **Revert.** The previous Worker ignores `grants`. Promoted admins keep their memberships. The takeover and isolation triggers stay and only refuse writes that were already unsafe.
 2. **`feature/webmaster-management` (no migration).**
    - **Scope.** A first `manage.ts` with `/api/manage` for `add_webmaster`, `remove_webmaster`, `set_webmaster_reads`, and `join_contest`. `/api/credentials` (`issueCredentials`), so that a new webmaster gets a password. `recoverWebmaster`. Bootstrap marks its one account as a webmaster. The join prompt and the Webmasters screen.
-   - **Focused tests.** `manage.test.ts` for the site commands. The join is refused in open mode, and D1 writes both audit rows. The last webmaster. Receipts on retry. `installation.test.ts`.
+   - **Focused tests.** `manageSite.test.ts` for the site commands. The join is refused in open mode, and D1 writes both audit rows. The last webmaster. Receipts on retry. `installation.test.ts`.
    - **Browser test.** A webmaster turns the restriction on, joins a contest, and sees the audit row.
    - **Revert.** Grants and settings rows stay. The previous Worker ignores them.
 3. **`feature/event-sign-in` (`0018`).**

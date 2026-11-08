@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
 import type { D1Connection, D1Statement } from '../d1/connection';
 import { D1Fixture, applyMigrations } from '../d1/testFixture';
 import { deleteFixtureRows, fenceFixtureEvent, forgetFixtureEvent } from './eventDeletionFixture';
@@ -8,6 +7,7 @@ import type { Caller } from '../../authentication';
 import { notificationStatements } from './application';
 import { type ContestAuthorityRow, contestDataBindings, contestDataSql } from './authority';
 import { connectLive, dispatchNotifications, maintainFixtureSessions, SessionLiveCoordinator, type LiveEnvironment } from './live';
+import { openLocalPlatform } from './tooling/store-database.mjs';
 
 class FakeSocket {
   messages: string[] = [];
@@ -100,9 +100,7 @@ describe('outbox retry fairness with real local D1', () => {
   let dispose: () => Promise<void>;
 
   beforeAll(async () => {
-    const platform = await getPlatformProxy<{ DB: D1Connection }>({
-      configPath: 'wrangler.auth-ci.jsonc', persist: false, remoteBindings: false, envFiles: [],
-    });
+    const platform = await openLocalPlatform<{ DB: D1Connection }>('wrangler.auth-ci.jsonc');
     db = platform.env.DB;
     dispose = platform.dispose;
     await applyMigrations(db);

@@ -20,7 +20,8 @@ export type Capability =
   | "announce"
   | "upload_staff_images"
   | "configure_contest"
-  | "see_members";
+  | "see_members"
+  | "export_contest";
 
 function hasRole(seat: Seat, role: Role): boolean {
   return seat.kind === "staff" && seat.roles.includes(role);
@@ -44,6 +45,7 @@ export const capabilityRule: { readonly [C in Capability]: (seat: Seat) => boole
   upload_staff_images: (seat) => seat.kind === "staff",
   configure_contest: isAdmin,
   see_members: isAdmin,
+  export_contest: isAdmin,
 };
 
 export function can(seat: Seat | null, capability: Capability): boolean {

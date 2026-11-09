@@ -17,7 +17,7 @@ interface Image {
   id: string; session_id: string; announcement_id: string; uploader: string; uploader_name: string;
   name: string; declared_bytes: number; content_type: string | null; object_key: string; state: string;
   request_command: string; expired: number; archived: number; manager: number;
-  announcement_removed: number; announcement_expired: number;
+  announcement_removed: number; announcement_expired: number; exporter: number;
 }
 
 const beginSchema = z.strictObject({
@@ -37,7 +37,7 @@ export function announcementImageKey(sessionId: string, announcementId: string, 
 
 const imageSql = `SELECT x.id, x.session_id, x.announcement_id, x.uploader, x.uploader_name, x.name,
   x.declared_bytes, x.content_type, x.object_key, x.state, x.request_command, (x.expires_at <= unixepoch()) AS expired,
-  c.archived, ${announcementManager('c')} AS manager,
+  c.archived, ${announcementManager('c')} AS manager, (c.staff = 1 AND c.is_admin = 1) AS exporter,
   (a.removed_at IS NOT NULL) AS announcement_removed,
   (a.expires_at IS NOT NULL AND a.expires_at <= ${announcementNow}) AS announcement_expired
   FROM announcement_images x JOIN announcements a ON a.id = x.announcement_id
@@ -230,8 +230,9 @@ export class R2AnnouncementImageService {
     const parsed = keySchema.safeParse(path.split('/'));
     if (!parsed.success) throw new ImageRequestError('Image unavailable.', { validation: true });
     const [sessionId, , , id] = parsed.data;
+    // The contest archive needs the files of a removed announcement. `exporter` is capabilityRule.export_contest in SQL.
     const allowed = (row: Image): row is Image & { content_type: string } => row.state === 'ready' && path === row.object_key && !!row.content_type &&
-      !row.announcement_removed && (!!row.manager || !row.announcement_expired);
+      (!!row.exporter || !row.announcement_removed && (!!row.manager || !row.announcement_expired));
     const row = await this.image(caller, sessionId, id);
     if (!allowed(row)) throw new ImageRequestError('Image unavailable.', { validation: true });
     const object = await this.bucket.get(path);

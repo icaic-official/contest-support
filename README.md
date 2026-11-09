@@ -1,11 +1,15 @@
 # Minsky
 
-Minsky is a support desk for contests.
-Teams report technical problems. Volunteers and specialists resolve them from one shared queue.
-The jury records time awards, and staff confirm when an award reaches the contest's own clock.
+Minsky is a support desk for contests. It was developed to support [ICAIC 2026](https://icaic.sg). 
+- Contestants (single / team) report technical problems or in general, any issues that they face during the contest.
+- Volunteers and specialists then resolve them from a shared contest queue.
+- Juries may award additional time to contestants, per their discretion. 
+<!-- The jury records time awards, and staff confirm when an award reaches the contest's own clock. -->
 
-Minsky runs on Cloudflare Workers, D1, R2, and Durable Objects. One installation can host many events.
-
+Currently, Minsky runs entirely on a Cloudflare Workers Paid Plan. 
+<!-- We use R2 for object storage and D1 as our SQLite Database 
+Minsky runs on Cloudflare Workers, D1, R2, and Durable Objects. One installation can host many events. -->
+ 
 **Project status.** Minsky is in development.
 No production installation exists, and it has not been verified in a live contest or at its target of 800 simultaneous users.
 It needs a network connection. The code uses the Apache License 2.0, and the documentation uses CC BY 4.0. See [License](#license).

@@ -359,6 +359,18 @@ describe("staff-only files", () => {
   });
 });
 
+describe("image order in the logs", () => {
+  it("follows upload time, not the order of the record or of the IDs", () => {
+    const record = fixtureRecord();
+    const base = record.issue_images[0]!;
+    const later = { ...base, id: ids.image(8), original_name: "second upload.png", created_at: "2026-11-08T09:30:00.000Z" };
+    const earlier = { ...base, id: ids.image(9), original_name: "first upload.png", created_at: "2026-11-08T09:20:00.000Z" };
+    record.issue_images = [later, earlier, ...record.issue_images];
+    const log = text(archiveEntries(record), "staff-only/log.html");
+    expect(log.indexOf("first upload.png")).toBeLessThan(log.indexOf("second upload.png"));
+  });
+});
+
 describe("HTML safety", () => {
   const record = fixtureRecord();
   record.contest.name = "<img src=x onerror=alert(1)>";

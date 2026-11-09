@@ -9,7 +9,7 @@ import { compactDate, safeName, slug, stampText } from "./archiveFormat.ts";
  *
  * `staff-only/` holds the whole record. `contestant-visible/` holds one folder for
  * each team, with only what that team could read, and one shared folder of
- * announcement images. Each team log is built from `teamView`, before any
+ * announcement images. Each team log is built from `teamViews`, before any
  * rendering, so no renderer can leak a staff-only row or another team's issue into it.
  */
 
@@ -81,7 +81,7 @@ const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
  * team saw them. The other teams and their issues are out, and so are the internal notes, the members,
  * the audit, the withdrawn award records, the removed announcements, the staff-only images, and the
  * images that are not ready. The public history keeps its award lines, as the contestant app shows them.
- * Each table is read once, so the cost grows with the rows and not with teams times rows.
+ * Each table is read once for all teams. The rendered logs still repeat the shared rows for each team.
  */
 export function teamViews(record: ContestRecord): Map<string, ContestRecord> {
   const shown = new Set(record.announcements.filter((announcement) => !announcement.removed_at).map((a) => a.id));

@@ -136,7 +136,7 @@ describe('the contest record read with local D1', () => {
       .toEqual([['alpha confirmed award', false, true], ['alpha withdrawn award', true, false]]);
     expect(record.contest_awards.map((award) => [award.explanation, award.withdrawn_name]).sort())
       .toEqual([['alpha waiting contest award', null], ['alpha withdrawn contest award', 'Staff']]);
-    // Resolutions come in issue order, not time order. The archive sorts them for display.
+    // Resolutions come in issue ID order, not time order. The archive sorts them for display.
     expect(record.resolutions.map((resolution) => resolution.summary).sort()).toEqual(['alpha also resolved', 'alpha resolved']);
   });
 

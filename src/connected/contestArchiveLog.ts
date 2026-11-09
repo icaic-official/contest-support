@@ -147,8 +147,11 @@ export function renderLog(record: ContestRecord, audience: Audience, links: Imag
   const history = groupBy(record.history, (entry) => entry.issue_id);
   const resolutions = groupBy(record.resolutions, (resolution) => resolution.issue_id);
   const awards = groupBy(record.awards, (award) => award.issue_id);
-  const images = groupBy(record.issue_images, (image) => image.issue_id);
-  const announcementImages = groupBy(record.announcement_images, (image) => image.announcement_id);
+  // The record lists images by parent and ID, so the log puts them in upload order.
+  const uploadOrder = (a: { created_at?: string; uploaded_at: string | null; id: string }, b: typeof a) =>
+    (a.created_at ?? a.uploaded_at ?? "").localeCompare(b.created_at ?? b.uploaded_at ?? "") || a.id.localeCompare(b.id);
+  const images = groupBy([...record.issue_images].sort(uploadOrder), (image) => image.issue_id);
+  const announcementImages = groupBy([...record.announcement_images].sort(uploadOrder), (image) => image.announcement_id);
 
   const imageList = (lines: ImageLine[]): Markup => {
     if (lines.length === 0) return html`<p class="meta">No images.</p>`;

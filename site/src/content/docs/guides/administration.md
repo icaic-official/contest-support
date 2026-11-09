@@ -107,10 +107,13 @@ The archive has two folders. The folder names say who may read the content.
 | `staff-only/issues.csv`, `staff-only/awards.csv` | One row for each issue, and one row for each award, for a spreadsheet. |
 | `staff-only/images/` | The staff-only images, in one folder for each issue. |
 | `staff-only/announcements/` | The images of removed announcements. |
-| `contestant-visible/log.html` | Only what the teams could see: public replies and the public timeline, resolutions, issue awards that were not withdrawn, confirmed contest-wide awards, and announcements that were not removed. |
-| `contestant-visible/images/`, `contestant-visible/announcements/` | The team-visible images and the images of announcements that were not removed. |
+| `contestant-visible/teams/<team folder>/log.html` | Only what that team could see: its public replies and public timeline, resolutions, and issue awards that were not withdrawn. The log also holds the confirmed contest-wide awards and the announcements that were not removed, because every team saw them. Each team has one folder, even a team with no issues. |
+| `contestant-visible/teams/<team folder>/images/` | The team-visible images of that team's issues, in one folder for each issue. |
+| `contestant-visible/announcements/` | The images of announcements that were not removed. Every team log links to them. |
 
-The `staff-only` folder holds internal notes. Do not give it to contestants. You can give the `contestant-visible` folder to a team, but it holds the replies and images of every team in the contest.
+The name of a team folder is a short form of the team name, a hyphen, and the first 8 characters of the team ID. `README.txt` lists each team folder with the team name and location.
+
+The `staff-only` folder holds internal notes. Do not give it to contestants. To give a team its record, copy the `contestant-visible` folder. In the copy, delete the folders of the other teams from the `teams` folder. Keep the `announcements` folder, because the team log links to its images.
 
 The archive names each member with a name and a username. It has no passwords and no profile pictures. A removed image appears only as a row with who removed it and when, because Minsky deleted its file.
 

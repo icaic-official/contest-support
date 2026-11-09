@@ -6,7 +6,8 @@ import { type ContestRecord, contestRecordSchema } from "./contestRecord.ts";
 /** Text that only staff may read. No contestant-visible archive file may hold it. */
 export const INTERNAL_NOTE = "SENTINEL-INTERNAL-NOTE do not tell the team about the cable stock";
 
-const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+/** The number is the first group, so that the first 8 characters of each ID differ. */
+const uuid = (n: number) => `${String(n).padStart(8, "0")}-0000-4000-8000-000000000000`;
 export const ids = {
   event: uuid(1),
   contest: uuid(2),
@@ -20,7 +21,7 @@ export const ids = {
 };
 
 /** The bytes that the fixture serves for an image. */
-export function imageBytes(imageId: string): Uint8Array {
+export function imageBytes(imageId: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(`fixture image ${imageId}`);
 }
 

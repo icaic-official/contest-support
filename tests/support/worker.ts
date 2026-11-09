@@ -335,6 +335,7 @@ export class FakeWorker extends FixtureWorker {
       issueCredentials: async (_caller, _requestId, input) => this.issue(input as CredentialIssue),
     },
     contestAwards: { execute: async () => randomUUID() },
+    contestRecord: { read: unavailable },
     announcements: {
       snapshot: async () => this.announcements,
       execute: async () => randomUUID(),

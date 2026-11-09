@@ -31,6 +31,7 @@ function services() {
       issueCredentials: vi.fn<ApplicationHttpServices['manage']['issueCredentials']>().mockResolvedValue([]),
     },
     contestAwards: { execute: vi.fn<ApplicationHttpServices['contestAwards']['execute']>().mockResolvedValue(requestId) },
+    contestRecord: { read: vi.fn<ApplicationHttpServices['contestRecord']['read']>() },
     images: {
       begin: vi.fn<ApplicationHttpServices['images']['begin']>(),
       upload: vi.fn<ApplicationHttpServices['images']['upload']>(),
@@ -118,6 +119,26 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(await response.json()).toEqual({ id: requestId });
     expect(deps.contestAwards.execute).toHaveBeenCalledWith(identity.caller, sessionId, requestId, command);
     expect((await handle(post('/api/contest-awards', { sessionId, command }))).status).toBe(400);
+  });
+
+  it('returns the contest record text as private JSON for the trusted caller', async () => {
+    const deps = services();
+    const text = '{"format":"minsky-contest-record","history":[{"text":"a \\"quoted\\" note"}]}';
+    deps.contestRecord.read.mockResolvedValueOnce(text);
+    const handle = createApplicationHandler(deps, origin);
+    const get = (path: string) => handle(new Request(`${origin}${path}`, { headers: { Origin: origin } }));
+    const response = await get(`/api/contest-record?sessionId=${sessionId}`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(text);
+    expect(deps.contestRecord.read).toHaveBeenCalledWith(identity.caller, sessionId);
+    expect(response.headers.get('Content-Type')).toBe('application/json');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect((await get('/api/contest-record?sessionId=nope')).status).toBe(400);
+    expect((await get('/api/contest-record')).status).toBe(400);
+    deps.contestRecord.read.mockRejectedValueOnce(new AuthenticationError(403, 'Only contest admins can download the contest record.'));
+    expect((await get(`/api/contest-record?sessionId=${sessionId}`)).status).toBe(403);
+    expect(deps.contestRecord.read).toHaveBeenCalledTimes(2);
   });
 
   it('reads contests and the event console with the trusted caller', async () => {

@@ -12,6 +12,7 @@ import { D1AnnouncementService } from './announcements';
 import { R2AnnouncementImageService } from './announcementImages';
 import { R2AvatarService } from './avatars';
 import { D1ContestAwardService } from './contestAwards';
+import { D1ContestRecordService } from './contestRecord';
 import { advanceDeletions } from './eventDeletion';
 import { D1ManageService } from './manage';
 import { createApplicationHandler, privateJson } from './http';
@@ -83,6 +84,7 @@ export default {
           workflow: new WorkflowService(new D1ApplicationStore(env.DB)),
           manage: new D1ManageService(env.DB, passwordHasher),
           contestAwards: new D1ContestAwardService(env.DB),
+          contestRecord: new D1ContestRecordService(env.DB),
           connect: (input, caller, sessionId) => connectLive(input, env, caller, sessionId),
         }, env.AUTH_ORIGIN)(request);
       }

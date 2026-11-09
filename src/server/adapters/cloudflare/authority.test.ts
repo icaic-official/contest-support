@@ -9,6 +9,7 @@ import { applyMigrations } from '../d1/testFixture';
 import { D1AnnouncementService } from './announcements';
 import { D1ApplicationService } from './application';
 import { authorityGuard, contestDataSql, resolveAuthority } from './authority';
+import { D1ContestRecordService } from './contestRecord';
 import { D1ManageService } from './manage';
 import { R2AvatarService } from './avatars';
 import { R2ImageService, type PrivateBucket } from './images';
@@ -149,12 +150,13 @@ describe('one authority resolver for every reader', () => {
     const { issue, image } = issues.get(contest) ?? { issue: '', image: '' };
     const imageRead = await new R2ImageService(db, bucket).download(caller, `${contestId}/${issue}/${image}/original`)
       .then(async (download) => { await download.body.cancel(); return true; }, () => false);
+    const exported = await new D1ContestRecordService(db).read(caller, contestId).then(() => true, () => false);
     const live = (await db.prepare(contestDataSql('logins')).bind(contestId, JSON.stringify([caller.loginId]))
       .all<{ staff: number; team_id: string | null }>()).results.filter((row) => row.staff || row.team_id).length === 1;
     const membership = snapshot?.membership;
     const seat: Seat = !membership ? 'none' : membership.team_id ? 'contestant'
       : membership.is_admin || membership.roles.length ? { admin: membership.is_admin, roles: [...membership.roles] } : 'plain';
-    return { seat, listed, announcements, avatars: avatars.map((avatar) => avatar.person_id).sort(), imageRead, live };
+    return { seat, listed, announcements, avatars: avatars.map((avatar) => avatar.person_id).sort(), imageRead, exported, live };
   }
 
   function expected(person: Person, contest: Contest, seat: Seat) {
@@ -162,7 +164,8 @@ describe('one authority resolver for every reader', () => {
     return {
       seat, listed: seat !== 'none', announcements: seat !== 'none',
       avatars: [...owners].map((owner) => callers[owner].accountId).sort(),
-      imageRead: isStaff(seat) || seat === 'contestant', live: isStaff(seat) || seat === 'contestant',
+      imageRead: isStaff(seat) || seat === 'contestant', exported: typeof seat === 'object' && seat.admin,
+      live: isStaff(seat) || seat === 'contestant',
     };
   }
 

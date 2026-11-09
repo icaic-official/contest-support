@@ -10,6 +10,7 @@ import { AnnouncementCommandError, type D1AnnouncementService } from './announce
 import type { R2AnnouncementImageService } from './announcementImages';
 import type { R2AvatarService } from './avatars';
 import type { D1ContestAwardService } from './contestAwards';
+import type { D1ContestRecordService } from './contestRecord';
 import type { D1ManageService } from './manage';
 import { logEvent, requestFields } from './log';
 import { baseSecurityHeaders } from './securityHeaders';
@@ -59,6 +60,7 @@ export interface ApplicationHttpServices {
   workflow: Pick<WorkflowService, 'execute'>;
   manage: Pick<D1ManageService, 'site' | 'event' | 'execute' | 'issueCredentials'>;
   contestAwards: Pick<D1ContestAwardService, 'execute'>;
+  contestRecord: Pick<D1ContestRecordService, 'read'>;
   images: Pick<R2ImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
   announcements: Pick<D1AnnouncementService, 'snapshot' | 'execute'>;
   announcementImages: Pick<R2AnnouncementImageService, 'begin' | 'upload' | 'finish' | 'remove' | 'download'>;
@@ -103,6 +105,11 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         }
         if (url.pathname === '/api/announcements') {
           return privateJson(await services.announcements.snapshot(caller, uuid.parse(url.searchParams.get('sessionId'))));
+        }
+        if (url.pathname === '/api/contest-record') {
+          // The service returns JSON text, so a Response avoids parsing and stringifying the whole record.
+          return new Response(await services.contestRecord.read(caller, uuid.parse(url.searchParams.get('sessionId'))),
+            { headers: { ...privateHeaders, 'Content-Type': 'application/json' } });
         }
         if (url.pathname === '/api/avatars') {
           return privateJson(await services.avatars.list(caller, uuid.parse(url.searchParams.get('sessionId'))));

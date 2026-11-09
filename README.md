@@ -154,7 +154,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Contribu
 
 ## License
 
-- Code: [Apache License 2.0]([Apache License 2.0](LICENSE))
-- Documentation: [CC BY CC 4.0](LICENSE-docs)
+- Code: [Apache License 2.0](LICENSE)
+- Documentation: [CC BY 4.0](LICENSE-docs)
 
 The code is licensed under the [Apache License 2.0](LICENSE).

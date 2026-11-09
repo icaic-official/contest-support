@@ -44,7 +44,7 @@ The [event platform design](docs/event-platform-design.md) explains the implemen
    The key stays out of `CLOUDFLARE_API_TOKEN`, so ordinary Wrangler commands never run with it. [AGENTS.md](AGENTS.md#api-tokens-for-agents) states the rules.
 3. Prepare a complete Cloudflare installation for production. Agents can create the production resources, named `minsky-prod*`.
    Each production deployment and each production D1 migration needs the owner's explicit approval for that release.
-   A production readiness checklist defines the remaining work. The 800-user capacity target needs a separate load test.
+   A production readiness checklist defines the remaining work. That checklist is not written yet. The 800-user capacity target needs a separate load test.
 
 **CI and publication, 2026-10-23 and 2026-10-24.** The target CI/CD is Cloudflare Workers Builds. GitHub Actions is not part of the stack. Do not add an Actions job.
 

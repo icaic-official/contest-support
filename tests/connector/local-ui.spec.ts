@@ -40,8 +40,9 @@ async function checkContestArchive(browser: Browser, fixture: UiFixture, db: Loc
     WHERE i.session_id = ? AND h.visibility = 'internal' AND NOT EXISTS (SELECT 1 FROM history p
       JOIN issues pi ON pi.id = p.issue_id WHERE pi.session_id = i.session_id AND p.visibility = 'public' AND p.text = h.text)`,
   fixture.sessionId);
-  const images = await all<{ id: string; visibility: string; original_digest: string }>(`SELECT id, visibility, original_digest
-    FROM issue_images WHERE session_id = ? AND state = 'ready'`, fixture.sessionId);
+  const images = await all<{ id: string; visibility: string; original_digest: string; team_id: string }>(`SELECT i.id, i.visibility, i.original_digest, s.team_id
+    FROM issue_images i JOIN issues s ON s.session_id = i.session_id AND s.id = i.issue_id
+    WHERE i.session_id = ? AND i.state = 'ready'`, fixture.sessionId);
   const removed = await all<{ id: string }>(`SELECT id FROM issue_images WHERE session_id = ? AND state IN ('deleting', 'deleted')`, fixture.sessionId);
   expect(notes.length, 'the journey wrote an internal note').toBeGreaterThan(0);
   expect(images.length, 'the journey kept a ready image').toBeGreaterThan(0);
@@ -71,10 +72,18 @@ async function checkContestArchive(browser: Browser, fixture: UiFixture, db: Loc
   }
   const digest = (path: string) => createHash('sha256').update(files[path]!).digest('hex');
   for (const image of images) {
-    const folder = image.visibility === 'public' ? 'contestant-visible' : 'staff-only';
-    const path = paths.find((candidate) => candidate.startsWith(`${root}/${folder}/images/`) && candidate.includes(image.id.slice(0, 8)));
-    expect(path, `image ${image.visibility}`).toBeDefined();
-    expect(digest(path!), 'the archived bytes match the stored digest').toBe(image.original_digest);
+    const matches = paths.filter((candidate) => candidate.includes(`/${image.id.slice(0, 8)}-`));
+    expect(matches, `image ${image.visibility} has one file`).toHaveLength(1);
+    const path = matches[0]!;
+    // A team-visible image sits in the folder of its issue's team: `<root>/contestant-visible/teams/<team>/images/...`.
+    const [, folder, subfolder, teamFolder, leaf] = path.split('/');
+    if (image.visibility === 'public') {
+      expect([folder, subfolder, leaf], 'a team-visible image is in a team folder').toEqual(['contestant-visible', 'teams', 'images']);
+      expect(teamFolder?.endsWith(`-${image.team_id.slice(0, 8)}`), 'the team folder of the issue').toBe(true);
+    } else {
+      expect([folder, subfolder], 'a staff-only image is in the staff folder').toEqual(['staff-only', 'images']);
+    }
+    expect(digest(path), 'the archived bytes match the stored digest').toBe(image.original_digest);
   }
   for (const image of removed) {
     expect(paths.some((path) => path.includes(image.id.slice(0, 8))), 'a removed image has no file').toBe(false);

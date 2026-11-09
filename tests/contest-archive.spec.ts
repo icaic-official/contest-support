@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { unzipSync } from "fflate";
 import type { Download, Page, Route } from "@playwright/test";
-import { fixtureRecord, ids, imageBytes } from "../src/connected/contestRecordFixture";
+import { CEDAR_REPLY, fixtureRecord, ids, imageBytes } from "../src/connected/contestRecordFixture";
 import { expect, test } from "./support/localWorker";
 
 // Staff download one zip of a contest. The browser builds it from the record and the images.
@@ -17,6 +17,9 @@ const sizes = {
 /** Set MINSKY_SHOTS to a folder to keep a screenshot of each width. */
 const shots = process.env.MINSKY_SHOTS;
 const zipName = "minsky-fixture-olympiad-spring-finals-20261103.zip";
+/** The first 8 characters of each fixture team's ID, which end its folder name. */
+const aurora = ids.teamA.slice(0, 8);
+const cedar = ids.teamB.slice(0, 8);
 
 async function signIn(page: Page, username: string) {
   await page.goto("/sign-in");
@@ -109,23 +112,35 @@ for (const [name, viewport] of Object.entries(sizes)) {
       "staff-only/log.html",
       "staff-only/issues.csv",
       "staff-only/awards.csv",
-      "contestant-visible/log.html",
-      expect.stringMatching(/^contestant-visible\/images\/issue-0001\/\d{8}-loose cable\.png$/u),
+      `contestant-visible/teams/aurora-${aurora}/log.html`,
+      `contestant-visible/teams/cedar-${cedar}/log.html`,
+      expect.stringMatching(new RegExp(`^contestant-visible/teams/aurora-${aurora}/images/issue-0001/\\d{8}-loose cable\\.png$`, "u")),
       expect.stringMatching(/^staff-only\/images\/issue-0001\/\d{8}-_stock room\.jpg$/u),
+      expect.stringMatching(new RegExp(`^contestant-visible/teams/cedar-${cedar}/images/issue-0007/\\d{8}-projector\\.png$`, "u")),
       expect.stringMatching(/^contestant-visible\/announcements\/\d{8}-menu\.webp$/u),
       expect.stringMatching(/^staff-only\/announcements\/\d{8}-wrong room\.png$/u),
       "README.txt",
       "manifest.json",
     ]);
     expect(files[`${root}/staff-only/log.html`]).toContain("SENTINEL-INTERNAL-NOTE");
-    expect(files[`${root}/contestant-visible/log.html`]).not.toContain("SENTINEL-INTERNAL-NOTE");
+    const teamLogs = {
+      aurora: files[`${root}/contestant-visible/teams/aurora-${aurora}/log.html`] ?? "",
+      cedar: files[`${root}/contestant-visible/teams/cedar-${cedar}/log.html`] ?? "",
+    };
+    for (const log of Object.values(teamLogs)) expect(log).not.toContain("SENTINEL-INTERNAL-NOTE");
+    // Each team log holds its own issues only.
+    expect(teamLogs.aurora).toContain("ISS-1:");
+    expect(teamLogs.aurora).not.toContain(CEDAR_REPLY);
+    expect(teamLogs.aurora).not.toContain("ISS-7:");
+    expect(teamLogs.cedar).toContain(CEDAR_REPLY);
+    expect(teamLogs.cedar).not.toContain("ISS-1:");
     expect(files[`${root}/README.txt`]).toContain("None.");
     expect(JSON.parse(files[`${root}/manifest.json`] ?? "{}")).toMatchObject({ missing: [], counts: { issues: 3 } });
 
     // The page asked for the Primary contest, and read the images through the access-checked routes.
     expect(stub.records).toEqual([local.sessions[0]]);
-    expect(stub.images).toHaveLength(4);
-    expect(stub.images.filter((path) => path.startsWith("/api/image/"))).toHaveLength(2);
+    expect(stub.images).toHaveLength(5);
+    expect(stub.images.filter((path) => path.startsWith("/api/image/"))).toHaveLength(3);
     expect(stub.images.filter((path) => path.startsWith("/api/announcement-image/"))).toHaveLength(2);
   });
 }
@@ -156,7 +171,7 @@ test("progress shows while images load, and an image that fails its digest goes 
   const saved = page.waitForEvent("download");
   await archive.click();
   await expect(archive).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByRole("status").filter({ hasText: "Downloading images 0 of 4." })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Downloading images 0 of 5." })).toBeVisible();
   // A second click while the first runs starts nothing.
   await archive.click();
   release();

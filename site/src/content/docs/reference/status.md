@@ -12,6 +12,7 @@ No production installation exists.
 These features are in `main`:
 
 - **Site and events.** One installation hosts many events. Webmasters create events and manage webmasters. Each event has one time zone, its own accounts, and its own event code.
+- **Event deletion.** A webmaster deletes a whole event permanently after a typed confirmation. This was added after the check above.
 - **Event console.** Event admins create contests, people, and entrants. They assign entrants and staff to contests, and issue credentials on printable sheets.
 - **Accounts.** Organizers create usernames and temporary passwords. Each person changes the temporary password at the first sign-in. Organizers reset lost passwords.
 - **Contests.** Each contest has a type, a kind, and a schedule. Intake follows the schedule, with a grace period and a hand override.
@@ -29,8 +30,8 @@ These features are in `main`:
 
 These features do not exist:
 
-- Deleting an event, a contest, a person, or an entrant.
-- A control that archives an event. The read-only state exists, but no screen or command sets it.
+- Deleting one contest, one person, or one entrant. A webmaster can delete only a whole event.
+- A control that makes an event read-only. Only an event deletion sets the read-only state.
 - A screen that changes an event's name, code, or time zone.
 - Importing a roster from a file. The event console takes pasted lines.
 - Configurable roles.

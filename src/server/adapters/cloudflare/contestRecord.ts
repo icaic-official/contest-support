@@ -34,11 +34,15 @@ const after = (...keys: string[]) => keys.length === 1 ? `${keys[0]} > ?`
   : `${keys[0]} >= ? AND (${keys.join(', ')}) > (${keys.map(() => '?').join(', ')})`;
 const seekValues = (cursor: D1Value[]): D1Value[] => cursor.length === 1 ? cursor : [cursor[0] ?? null, ...cursor];
 
-/** A table of the contest, in time order. Binds contestId, the seek values, and the page size. */
-const byTime = (from: string, alias: string, time: string, row: string) => `SELECT ${row} AS row,
-    ${alias}.${time} AS k1, ${alias}.id AS k2
-  FROM ${from} WHERE ${alias}.session_id = ? AND ${after(`${alias}.${time}`, `${alias}.id`)}
-  ORDER BY ${alias}.${time}, ${alias}.id LIMIT ?`;
+/**
+ * A table of the contest, ordered by `key` and then `id`. The key must be the second column of an index
+ * on `(session_id, key)`. Then each page starts at its cursor and sorts only the rows of one key value,
+ * so a page never sorts the whole contest again. Binds contestId, the seek values, and the page size.
+ */
+const byKey = (from: string, alias: string, key: string, row: string) => `SELECT ${row} AS row,
+    ${alias}.${key} AS k1, ${alias}.id AS k2
+  FROM ${from} WHERE ${alias}.session_id = ? AND ${after(`${alias}.${key}`, `${alias}.id`)}
+  ORDER BY ${alias}.${key}, ${alias}.id LIMIT ?`;
 
 const awardColumns = (a: string) => `'id', ${a}.id, 'minutes', ${a}.minutes, 'explanation', ${a}.explanation,
   'actor', ${a}.actor, 'actor_name', ${a}.actor_name, 'at', ${a}.at, 'applied_at', ${a}.applied_at,
@@ -77,30 +81,30 @@ export const sections: readonly Section[] = [
       FROM issues i CROSS JOIN history h ON h.issue_id = i.id
       WHERE i.session_id = ? AND ${after('i.number', 'h.at', 'h.id')}
       ORDER BY i.number, h.at, h.id LIMIT ?` },
-  { name: 'resolutions', start: ['', ''], sql: byTime('resolutions r', 'r', 'at', `json_object('id', r.id,
+  { name: 'resolutions', start: ['', ''], sql: byKey('resolutions r', 'r', 'issue_id', `json_object('id', r.id,
       'session_id', r.session_id, 'issue_id', r.issue_id, 'actor', r.actor, 'actor_name', r.actor_name, 'at', r.at,
       'summary', r.summary, 'reopened_at', r.reopened_at, 'reopened_by', r.reopened_by,
       'reopened_name', r.reopened_name, 'reason', r.reason)`) },
-  { name: 'awards', start: ['', ''], sql: byTime('awards w', 'w', 'at', `json_object(${awardColumns('w')},
+  { name: 'awards', start: ['', ''], sql: byKey('awards w', 'w', 'issue_id', `json_object(${awardColumns('w')},
       'issue_id', w.issue_id, 'resolution_id', w.resolution_id)`) },
-  { name: 'contest_awards', start: ['', ''], sql: byTime('contest_awards k', 'k', 'at', `json_object(${awardColumns('k')})`) },
-  { name: 'announcements', start: ['', ''], sql: byTime('announcements a', 'a', 'published_at', `json_object('id', a.id,
+  { name: 'contest_awards', start: ['', ''], sql: byKey('contest_awards k', 'k', 'at', `json_object(${awardColumns('k')})`) },
+  { name: 'announcements', start: ['', ''], sql: byKey('announcements a', 'a', 'published_at', `json_object('id', a.id,
       'title', a.title, 'details', a.details, 'author', a.author, 'author_name', a.author_name,
       'published_at', a.published_at, 'expires_at', a.expires_at, 'edited_at', a.edited_at, 'edited_by', a.edited_by,
       'edited_name', a.edited_name, 'removed_at', a.removed_at, 'removed_by', a.removed_by,
       'removed_name', a.removed_name)`) },
   // A path names stored bytes only while the image is ready. Every other state keeps its row and no path.
-  { name: 'issue_images', start: ['', ''], sql: byTime('issue_images x', 'x', 'created_at', `json_object('id', x.id,
+  { name: 'issue_images', start: ['', ''], sql: byKey('issue_images x', 'x', 'issue_id', `json_object('id', x.id,
       'issue_id', x.issue_id, 'uploader', x.uploader, 'uploader_name', x.uploader_name, 'visibility', x.visibility,
       'state', x.state, 'byte_size', x.byte_size, 'content_type', x.content_type, 'original_name', x.original_name,
       'original_path', CASE WHEN x.state = 'ready' THEN x.original_path END, 'original_digest', x.original_digest,
       'created_at', x.created_at, 'uploaded_at', x.uploaded_at, 'deleted_by', x.deleted_by, 'deleted_at', x.deleted_at)`) },
-  { name: 'announcement_images', start: ['', ''], sql: byTime('announcement_images x', 'x', 'created_at', `json_object('id', x.id,
+  { name: 'announcement_images', start: ['', ''], sql: byKey('announcement_images x', 'x', 'announcement_id', `json_object('id', x.id,
       'announcement_id', x.announcement_id, 'uploader', x.uploader, 'uploader_name', x.uploader_name, 'name', x.name,
       'state', x.state, 'byte_size', x.byte_size, 'content_type', x.content_type,
       'object_key', CASE WHEN x.state = 'ready' THEN x.object_key END, 'digest', x.digest,
       'uploaded_at', x.uploaded_at, 'deleted_by', x.deleted_by, 'deleted_at', x.deleted_at)`) },
-  { name: 'audit', start: ['', ''], sql: byTime('admin_audit d LEFT JOIN accounts p ON p.id = d.actor', 'd', 'at', `json_object('id', d.id,
+  { name: 'audit', start: ['', ''], sql: byKey('admin_audit d LEFT JOIN accounts p ON p.id = d.actor', 'd', 'at', `json_object('id', d.id,
       'actor', d.actor, 'actor_name', p.name, 'at', d.at, 'action', d.action, 'target', d.target,
       'detail', json(d.detail))`) },
 ];

@@ -143,18 +143,14 @@ These commands work only with the maintainers' own Cloudflare account. The hoste
 | `scripts/` | CI, deployment, load, and performance tools. |
 
 ## Documentation
-
 - The [user and operator guides](https://minsky-docs.icaic-minsky.workers.dev) explain how to use and install Minsky. Their source is in `site/src/content/docs/`.
 - The [developer documentation index](docs/README.md) lists the architecture, testing, and operations pages.
 - The [roadmap](ROADMAP.md) states the project's goals and target stack.
 
 ## Contribute
-
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Contributions are welcome
 
 ## License
-
-- Code: [Apache License 2.0]([Apache License 2.0](LICENSE))
+- Code: [Apache License 2.0](LICENSE))
 - Documentation: [CC BY CC 4.0](LICENSE-docs)
 
-The code is licensed under the [Apache License 2.0](LICENSE).

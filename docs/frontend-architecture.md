@@ -423,7 +423,7 @@ The builder and fflate load on the first click. No screen carries them. `npm run
 
 | File | Content |
 | --- | --- |
-| `contestArchive.ts` | Pure layout. `archiveEntries(record)` returns every file except `README.txt` and `manifest.json`. `imageEntries` places images. `teamView` filters the record to one team. `readmeEntry` and `manifestEntry` run after the images. |
+| `contestArchive.ts` | Pure layout. `archiveEntries(record)` returns every file except `README.txt` and `manifest.json`. `imageEntries` places images. `teamViews` builds the record of each team in one pass. `readmeEntry` and `manifestEntry` run after the images. |
 | `contestArchiveLog.ts` | `renderLog` writes `log.html`. The `html` template escapes every value. The page has inline CSS, no script, and a Content-Security-Policy that forbids scripts. |
 | `contestArchiveCsv.ts` | `issues.csv` and `awards.csv`. RFC 4180 quoting, a byte order mark, and a leading apostrophe for a cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return. |
 | `archiveFormat.ts` | Times in the event time zone plus ISO, `safeName` and `slug`. |
@@ -446,7 +446,7 @@ The zip has one root folder, `minsky-<event code or event>-<contest slug>-<YYYYM
 
 `<team>` is the slug of the team name, a hyphen, and the first 8 characters of the team ID. A name that reduces to nothing becomes `team`. If two teams still get the same folder name, the second one ends with `-2`. The teams are sorted first, so a team keeps its number on every export. `README.txt` lists each team folder with the team name and location.
 
-`teamView(record, teamId)` builds the view of one team from the record before any file is rendered. So no renderer can put an internal note, a staff-only image, the audit, a withdrawn award record, a removed announcement, or an issue of another team into the folder of a team. The public timeline keeps the lines that announced an award and its withdrawal, because contestants saw them in the app. An announcement image whose announcement the record lacks goes to `staff-only/`. A team-visible image whose issue team the record lacks goes to `staff-only/` too. An image that is not `ready` has no file. The logs and `record.json` list it as metadata.
+`teamViews(record)` builds the view of each team from the record before any file is rendered. So no renderer can put an internal note, a staff-only image, the audit, a withdrawn award record, a removed announcement, or an issue of another team into the folder of a team. The public timeline keeps the lines that announced an award and its withdrawal, because contestants saw them in the app. An announcement image whose announcement the record lacks goes to `staff-only/`. A team-visible image whose issue team the record lacks goes to `staff-only/` too. An image that is not `ready` has no file. The logs and `record.json` list it as metadata.
 
 To give a team its record, copy `contestant-visible/`, then delete the other teams' folders from `teams/`. The team log opens announcement images with the relative path `../../announcements/`, so the `announcements/` folder must stay beside `teams/`. The view runs once for each team, and each run reads every row of the record. So the time to build the file list grows with the number of teams times the number of rows.
 

@@ -75,37 +75,49 @@ const announcementImageFolder = (announcementRemoved: boolean) =>
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
- * What one team could read. Its own issues are in, with their public history, resolutions,
- * issue awards that were not withdrawn, and ready team-visible images. The contest-wide
- * awards that staff confirmed and the announcements that were not removed are in too,
- * because every team saw them. The other teams and their issues are out, and so are the
- * internal notes, the members, the audit, the withdrawn award records, the removed
- * announcements, the staff-only images, and the images that are not ready.
- * The public history keeps its award lines, as the contestant app shows them.
+ * What each team could read, by team ID. A team's own issues are in, with their public history,
+ * resolutions, issue awards that were not withdrawn, and ready team-visible images. The contest-wide
+ * awards that staff confirmed and the announcements that were not removed are in too, because every
+ * team saw them. The other teams and their issues are out, and so are the internal notes, the members,
+ * the audit, the withdrawn award records, the removed announcements, the staff-only images, and the
+ * images that are not ready. The public history keeps its award lines, as the contestant app shows them.
+ * Each table is read once, so the cost grows with the rows and not with teams times rows.
  */
-export function teamView(record: ContestRecord, teamId: string): ContestRecord {
+export function teamViews(record: ContestRecord): Map<string, ContestRecord> {
   const shown = new Set(record.announcements.filter((announcement) => !announcement.removed_at).map((a) => a.id));
-  const issues = record.issues.filter((issue) => issue.team_id === teamId);
-  const own = new Set(issues.map((issue) => issue.id));
-  const ofTeam = (row: { issue_id: string }) => own.has(row.issue_id);
-  return {
+  const announcements = record.announcements.filter((announcement) => shown.has(announcement.id));
+  const announcementImages = record.announcement_images.filter(
+    (image) => shown.has(image.announcement_id) && image.state === "ready",
+  );
+  const contestAwards = record.contest_awards.filter((award) => award.applied_at && !award.withdrawn_at);
+  const views = new Map(record.teams.map((team): [string, ContestRecord] => [team.id, {
     ...record,
-    teams: record.teams.filter((team) => team.id === teamId),
+    teams: [team],
     members: [],
-    issues,
-    history: record.history.filter((entry) => entry.visibility === "public" && ofTeam(entry)),
-    resolutions: record.resolutions.filter(ofTeam),
-    awards: record.awards.filter((award) => !award.withdrawn_at && ofTeam(award)),
-    contest_awards: record.contest_awards.filter((award) => award.applied_at && !award.withdrawn_at),
-    announcements: record.announcements.filter((announcement) => shown.has(announcement.id)),
-    issue_images: record.issue_images.filter(
-      (image) => image.visibility === "public" && image.state === "ready" && ofTeam(image),
-    ),
-    announcement_images: record.announcement_images.filter(
-      (image) => shown.has(image.announcement_id) && image.state === "ready",
-    ),
+    issues: [],
+    history: [],
+    resolutions: [],
+    awards: [],
+    contest_awards: contestAwards,
+    announcements,
+    issue_images: [],
+    announcement_images: announcementImages,
     audit: [],
-  };
+  }]));
+  const owner = new Map<string, ContestRecord>();
+  for (const issue of record.issues) {
+    const view = views.get(issue.team_id);
+    if (!view) continue;
+    view.issues.push(issue);
+    owner.set(issue.id, view);
+  }
+  for (const entry of record.history) if (entry.visibility === "public") owner.get(entry.issue_id)?.history.push(entry);
+  for (const resolution of record.resolutions) owner.get(resolution.issue_id)?.resolutions.push(resolution);
+  for (const award of record.awards) if (!award.withdrawn_at) owner.get(award.issue_id)?.awards.push(award);
+  for (const image of record.issue_images) {
+    if (image.visibility === "public" && image.state === "ready") owner.get(image.issue_id)?.issue_images.push(image);
+  }
+  return views;
 }
 
 /** A path that no earlier path equals, ignoring case, because Windows and macOS ignore it. */
@@ -192,9 +204,12 @@ export function archiveEntries(record: ContestRecord): ArchiveEntry[] {
   const images = imageEntries(record);
   const links: ImageLinks = new Map(images.map((image) => [image.imageId, image.path]));
   const staff = staffFiles.map((file): TextEntry => ({ path: file.path, kind: "text", text: file.render(record, links) }));
+  const views = teamViews(record);
   const teams = teamFolders(record).map(({ team, folder }): TextEntry => {
     const path = `${folder}/log.html`;
-    return { path, kind: "text", text: renderLog(teamView(record, team.id), "contestant", links, path) };
+    const view = views.get(team.id);
+    if (!view) throw new Error("Every team folder has a view.");
+    return { path, kind: "text", text: renderLog(view, "contestant", links, path) };
   });
   return [...staff, ...teams, ...images];
 }

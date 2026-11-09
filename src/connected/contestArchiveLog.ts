@@ -134,7 +134,7 @@ function groupBy<T>(items: readonly T[], key: (item: T) => string): Map<string, 
 
 const byTime = (a: { at: string }, b: { at: string }) => Date.parse(a.at) - Date.parse(b.at);
 
-/** Renders the record for one audience. Pass `teamView(record, teamId)` for the log of one team. */
+/** Renders the record for one audience. Pass one view of `teamViews(record)` for the log of one team. */
 export function renderLog(record: ContestRecord, audience: Audience, links: ImageLinks, from: string): string {
   const zone = record.event.time_zone;
   const staff = audience === "staff";

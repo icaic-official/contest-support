@@ -6,7 +6,7 @@ import {
   imageEntries,
   manifestEntry,
   readmeEntry,
-  teamView,
+  teamViews,
   type ArchiveEntry,
 } from "./contestArchive";
 import { awardsCsv, issuesCsv } from "./contestArchiveCsv";
@@ -289,7 +289,7 @@ describe("the view of one team", () => {
   const record = fixtureRecord();
 
   it("keeps the issues of that team and drops every other row that the team could not see", () => {
-    const view = teamView(record, ids.teamA);
+    const view = teamViews(record).get(ids.teamA)!;
     expect(view.teams.map((team) => team.id)).toEqual([ids.teamA]);
     expect(view.issues.map((issue) => issue.number)).toEqual([1, 12]);
     expect(view.history.every((entry) => entry.visibility === "public")).toBe(true);
@@ -306,7 +306,7 @@ describe("the view of one team", () => {
   });
 
   it("gives the other team its own rows, and the shared rows too", () => {
-    const view = teamView(record, ids.teamB);
+    const view = teamViews(record).get(ids.teamB)!;
     expect(view.issues.map((issue) => issue.number)).toEqual([7]);
     expect(view.history.map((entry) => entry.text)).toContain(CEDAR_REPLY);
     expect(view.awards).toEqual([]);
@@ -316,11 +316,14 @@ describe("the view of one team", () => {
   });
 
   it("holds nothing of an issue for a team that has none, and does not change the record", () => {
-    const copy = structuredClone(record);
-    const view = teamView(record, "00000009-0000-4000-8000-000000000000");
-    expect([view.teams, view.issues, view.history, view.resolutions, view.awards, view.issue_images]).toEqual([[], [], [], [], [], []]);
+    const quiet = "00000009-0000-4000-8000-000000000000";
+    const withQuiet = { ...record, teams: [...record.teams, { ...record.teams[0]!, id: quiet, name: "Quiet" }] };
+    const copy = structuredClone(withQuiet);
+    const view = teamViews(withQuiet).get(quiet)!;
+    expect(view.teams.map((team) => team.id)).toEqual([quiet]);
+    expect([view.issues, view.history, view.resolutions, view.awards, view.issue_images]).toEqual([[], [], [], [], []]);
     expect(view.announcements).toHaveLength(1);
-    expect(record).toEqual(copy);
+    expect(withQuiet).toEqual(copy);
   });
 });
 

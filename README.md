@@ -155,6 +155,6 @@ These commands work only with the maintainers' own Cloudflare account. The hoste
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request. Contributions are welcome
 
 ## License
-- Code: [Apache License 2.0](LICENSE))
-- Documentation: [CC BY CC 4.0](LICENSE-docs)
+- Code: [Apache License 2.0](LICENSE)
+- Documentation: [CC BY 4.0](LICENSE-docs)
 

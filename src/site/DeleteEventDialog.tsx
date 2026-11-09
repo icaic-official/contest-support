@@ -1,4 +1,5 @@
 import { type FormEvent, useId, useState } from "react";
+import { Link } from "react-router";
 import { deletionConfirmation, type SiteOverview } from "@/backend/contracts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { eventPath } from "@/connected/navigation";
 
 type SiteEvent = SiteOverview["events"][number];
 
@@ -92,6 +94,13 @@ function DeleteEventForm({
           You cannot undo this.
         </DialogDescription>
       </DialogHeader>
+      <p className="text-sm">
+        Download the archive of each contest from{" "}
+        <Link to={eventPath(event.id)} className="font-medium underline underline-offset-4">
+          the event console
+        </Link>{" "}
+        first.
+      </p>
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>

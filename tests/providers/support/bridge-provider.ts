@@ -104,6 +104,7 @@ export function createBrowserProvider(configuration: unknown): BrowserProvider {
     manage: {
       site: async () => unsupported(),
       event: async () => unsupported(),
+      contestRecord: async () => unsupported(),
       execute: async () => unsupported(),
       issueCredentials: async () => unsupported(),
     },

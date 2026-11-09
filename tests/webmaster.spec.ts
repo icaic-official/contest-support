@@ -137,6 +137,7 @@ test.describe('deleting an event', () => {
     await expect(dialog).toContainText('Everyone in this event is signed out at once');
     await expect(dialog).toContainText('a running contest stops');
     await expect(dialog).toContainText('name and code stay in the site record');
+    await expect(dialog).toContainText('Download the archive of each contest from the event console first.');
     const confirm = dialog.getByRole('button', { name: 'Delete event', exact: true });
     const typed = dialog.getByLabel('Type the event name to confirm');
     await expect(confirm).toBeDisabled();
@@ -159,6 +160,24 @@ test.describe('deleting an event', () => {
     await expect(open).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /^Deletions/ })).toBeFocused();
     await expect(page.getByText(`Deleting ${name}. Its progress is under Deletions.`)).toBeVisible();
+  });
+
+  test('links to the event console, where each contest has a download, and leaves the deletion available', async ({ page, local }) => {
+    const name = await newEvent(local);
+    const [event] = await local.rows<{ id: string }>('SELECT id FROM events WHERE name = ?', name);
+    await openSite(page);
+    await page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete ${name}?` });
+    const link = dialog.getByRole('link', { name: 'the event console', exact: true });
+    await expect(link).toHaveAttribute('href', `/event/${event?.id}`);
+    // The link never blocks the deletion.
+    await dialog.getByLabel('Type the event name to confirm').fill(name);
+    await expect(dialog.getByRole('button', { name: 'Delete event', exact: true })).toBeEnabled();
+    await link.click();
+    await expect(page).toHaveURL((url) => url.pathname === `/event/${event?.id}`);
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+    await page.getByRole('tab', { name: 'Contests', exact: true }).click();
+    await expect(page.getByText('No contests yet.')).toBeVisible();
   });
 
   test('confirms an unnamed event with its code, and never enables the action on empty input', async ({ page, local }) => {

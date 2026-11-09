@@ -4,6 +4,7 @@ import { createCloudflareBackend } from './backend';
 import type { Backend } from '../contracts';
 import { AnnouncementRejectedError, ImageRequestError, RequestRefusedError, WorkflowRejectedError } from '../errors';
 import { AVATAR_MAX_BYTES } from '../../connected/imageFile';
+import { fixtureRecord } from '../../connected/contestRecordFixture';
 
 const origin = 'https://connector.example';
 const sessionId = '49c15a39-79ec-4597-bad6-2b949cfe32b2';
@@ -189,6 +190,20 @@ describe('Cloudflare Backend transport', () => {
       () => Response.json({ error: 'Database failed.' }, { status: 503 }),
       () => { throw new TypeError('Lost response.'); },
     ]) await expect(send(response)).rejects.not.toBeInstanceOf(RequestRefusedError);
+  });
+
+  it('reads the contest record with one same-origin request and parses it at the boundary', async () => {
+    const record = fixtureRecord();
+    const fetcher = transport(() => Response.json(record));
+    const backend = createCloudflareBackend({ origin, fetch: fetcher });
+    await expect(backend.manage.contestRecord(sessionId)).resolves.toEqual(record);
+    const [url, init] = fetcher.mock.calls.at(-1) ?? [];
+    expect(String(url)).toBe(`${origin}/api/contest-record?sessionId=${sessionId}`);
+    expect(init).toMatchObject({ cache: 'no-store', credentials: 'same-origin' });
+    const refused = createCloudflareBackend({ origin, fetch: transport(() => Response.json({ error: 'Only an admin can export a contest.' }, { status: 403 })) });
+    await expect(refused.manage.contestRecord(sessionId)).rejects.toThrow('Only an admin can export a contest.');
+    const incomplete = createCloudflareBackend({ origin, fetch: transport(() => Response.json({ format: 'minsky-contest-record', version: 1 })) });
+    await expect(incomplete.manage.contestRecord(sessionId)).rejects.toThrow();
   });
 
   it('retains image retry classification and requires authorized uncached downloads', async () => {

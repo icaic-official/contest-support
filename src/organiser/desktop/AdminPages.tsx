@@ -11,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { can, seatOf } from "@/connected/capabilities";
+import { ContestArchiveButton } from "@/connected/ContestArchiveButton";
 import { normalizeTeamText } from "@/connected/teamSearch";
 import type { Snapshot } from "@/connected/model";
 import { cn } from "@/lib/utils";
@@ -387,8 +389,9 @@ export function AccountsPage({
 }
 
 /**
- * Session settings: contestant intake, image limits and the categories. In
- * an archived event every control is disabled.
+ * Session settings: contestant intake, image limits, the categories and the
+ * archive download. In an archived event every control is disabled, except the
+ * download, which only reads.
  */
 export function SettingsPage({
   props,
@@ -428,6 +431,14 @@ export function SettingsPage({
       >
         <CategoryEditor state={props.state} admin={admin} />
       </Panel>
+      {can(seatOf(props.member), "export_contest") && (
+        <Panel
+          title="Archive"
+          description="Download the issues, replies, notes, awards, and images of this contest as one zip file. The file holds internal staff notes. Keep it private."
+        >
+          <ContestArchiveButton contestId={session.id} contestName={session.name} />
+        </Panel>
+      )}
     </div>
   );
 }

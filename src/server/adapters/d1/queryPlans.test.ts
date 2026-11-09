@@ -3,6 +3,7 @@ import { openStoreDatabase } from '../cloudflare/tooling/store-database.mjs';
 import { snapshotSql as announcementSnapshotSql } from '../cloudflare/announcements';
 import { calendarSql, contestsListSql, eventContestsSql, snapshotSql } from '../cloudflare/application';
 import { contestDataSql, signInAccountSql } from '../cloudflare/authority';
+import { headerSql as contestRecordHeaderSql, sections as contestRecordSections } from '../cloudflare/contestRecord';
 import { CLAIM_DELETION_SQL } from '../cloudflare/eventDeletion';
 import { claimSql } from '../cloudflare/live';
 import { eventConsoleSql, siteEventsSql } from '../cloudflare/manage';
@@ -27,6 +28,8 @@ const queries: Record<string, string> = {
   'event sign-in': signInAccountSql.event,
   'site sign-in': signInAccountSql.site,
   'deletion claim': CLAIM_DELETION_SQL,
+  'contest record header': contestRecordHeaderSql,
+  ...Object.fromEntries(contestRecordSections.map(({ name, sql }) => [`contest record ${name}`, sql])),
 };
 
 // Both snapshots materialize the resolver row as `access` and read it as `c`.

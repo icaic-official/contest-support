@@ -376,7 +376,7 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     await expect(images.finish(contestant, fixture.sessionId, pending.id)).rejects.toMatchObject(denied);
   });
 
-  it('keeps the images and files of a removed announcement and hides them from everyone', async () => {
+  it('keeps the images and files of a removed announcement, and lets only an admin download them for the archive', async () => {
     const id = await publish();
     const image = await publishedImage(id);
     const unfinished = await reserve(id);
@@ -385,9 +385,16 @@ describe('Cloudflare session announcements with local D1 and R2 bindings', () =>
     await images.remove(admin, fixture.sessionId, unfinished.id, true);
     expect(await bucket.get(unfinished.path)).toBeNull();
     for (const caller of [contestant, jury, admin]) {
-      await expect(images.download(caller, image.path)).rejects.toMatchObject({ validation: true });
       expect((await read(caller)).images).toEqual([]);
     }
+    for (const caller of [contestant, jury]) {
+      await expect(images.download(caller, image.path)).rejects.toMatchObject({ validation: true });
+    }
+    // Without the jury role the specialist is plain support staff, who may not download either.
+    await statement("DELETE FROM membership_roles WHERE session_id = ? AND account_id = ? AND role = 'jury'", fixture.sessionId, jury.accountId).run();
+    await expect(images.download(jury, image.path)).rejects.toMatchObject({ validation: true });
+    expect(await bytesOf(image.path, admin)).toEqual(png);
+    await expect(images.download(admin, unfinished.path)).rejects.toMatchObject({ validation: true });
     await expect(reserve(id)).rejects.toMatchObject({ validation: true });
     await expect(images.remove(admin, fixture.sessionId, image.id)).rejects.toMatchObject({ validation: true });
     expect(await statement('SELECT state FROM announcement_images WHERE id = ?', image.id).first()).toEqual({ state: 'ready' });

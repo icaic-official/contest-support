@@ -100,6 +100,8 @@ The deletion removes these items:
 
 It also signs out everyone in the event at once and stops a running contest. Only the name and the code of the event stay, in the site record.
 
+The deletion does not wait for an export. Once it starts, nobody can read the event. To keep the records, first [download the archive of each contest](/guides/administration/#download-the-contest-archive) from the event console. The dialog links to the console.
+
 1. On the **Site** page, find the event in the **Events** list and select **Delete event**.
 2. Read the dialog. It names the number of contests and accounts that go.
 3. Type the event name exactly as it shows. For an event with no name, type its event code.

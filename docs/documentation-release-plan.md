@@ -7,7 +7,6 @@ Remove an item when it is complete. When the list is empty, delete this page.
 
 Do not invent an answer to any of these items.
 
-- **License.** Select the application and documentation licenses, and add `LICENSE`. Until then, `README.md` and the [feature status page](../site/src/content/docs/reference/status.md) state that no license is chosen.
 - **Git history.** The repository is private. Publishing it also publishes its whole history, including the deleted project records and their infrastructure names. Choose between publishing the history as it is, rewriting it, and starting a new repository. A rewrite or a new repository must not lose the review evidence that the maintainers want to keep.
 - **Security reports.** Choose a private reporting route, and add `SECURITY.md`. GitHub's private vulnerability reporting needs a repository setting.
 - **Support and conduct.** State where ordinary support requests belong and which versions get support. Decide whether to add a code of conduct.

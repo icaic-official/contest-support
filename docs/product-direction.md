@@ -85,6 +85,14 @@ No production installation exists. Live-contest use and the [capacity targets](#
 - Images are in a private R2 bucket.
 - An account can have one profile picture. The server returns staff pictures to staff only.
 
+### Contest archive
+
+- Contest admins, event admins, and webmasters can download one zip file that holds the support record of one contest and its images. A webmaster under the read restriction must join the contest first.
+- The archive keeps every record: issues, public replies, internal notes, history, resolutions, issue awards and contest-wide awards with withdrawn ones, announcements with removed ones, image details in every state, members, and the whole administration audit.
+- The file layout separates staff-only content from content that contestants could see. The contestant-visible part has one folder for each team, so staff can hand a team its own record. A team folder holds only that team's issues and images, plus the confirmed contest-wide awards and the announcements that every team saw. Announcement images sit in one shared folder. Contestant-visible files hold no internal notes, staff-only images, audit, withdrawn award records, or removed announcements. Their timeline keeps the public lines that announced an award and its withdrawal, as the contestant app showed them.
+- The archive is available at any time until a deletion starts. The deletion does not wait for it, and the delete dialog points to the event console to download it first.
+- The browser builds the zip file. See [Contest archive](event-platform-design.md#contest-archive) for the reason.
+
 ### Announcements
 
 Contest admins and jury publish announcements for a contest. Every member reads the active ones above the issue workspace. See [session announcements](session-announcements.md).
@@ -122,7 +130,7 @@ Contest admins and jury publish announcements for a contest. Every member reads 
 - It has no local demo runtime, no persona switching or impersonation control, and no shared-data reset control in the connected product.
 - It does not change an external contest clock.
 - It does not let contestants upload images.
-- It has no per-contest archive.
+- It has no read-only state for one contest. Only a whole event becomes read-only.
 - It has no helper zones, quick replies, floor map, configurable aging thresholds, or per-category icons and descriptions. These items need data that the schema does not hold.
 
 Minsky needs a network connection. Offline capture, venue-local resilience, and a manual fallback are deferred, and they do not block cloud features.
@@ -135,7 +143,6 @@ Minsky needs a network connection. Offline capture, venue-local resilience, and 
 - Shared incidents, with explicit affected rosters, selective closure of linked reports, and bulk awards with recipient exceptions.
 - In-app alerts, and browser push that users explicitly enable.
 - CSV file import for rosters. The event console takes pasted lines of `name, username`.
-- An export of the contest support log.
 
 ## Capacity targets
 

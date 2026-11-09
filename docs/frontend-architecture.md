@@ -352,7 +352,7 @@ It uses the same hooks, rules and forms as the phone app. It adds no workflow ru
 | `IssueTable.tsx` | `IssueTable` (number, status with icon and label, report and category, team and location, owner, aging timer, **Claim** or **Accept**) and `StatCards`. `queueSort.ts` holds the sort order. |
 | `IssueSheet.tsx` | The issue side sheet: timer cards, owner, lifecycle steps with times, handoff banner, actions, the Activity, Images and Outcome & award tabs and the reply composer. |
 | `AwardReviewPage.tsx` | The contest-wide award panel and the lists from `awardLists()`: To decide, To apply and Applied. Each card shows `AwardEvidence` and has the award form or the confirmation form. |
-| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, and the **Manage** dialog with the one-time credentials), `RosterPage` (the **Team locations** page) and `SettingsPage` (intake, image limits, the category editor). |
+| `AdminPages.tsx` | `OverviewPage`, `AccountsPage` (table, filter, and the **Manage** dialog with the one-time credentials), `RosterPage` (the **Team locations** page) and `SettingsPage` (intake, image limits, the category editor, and the **Archive** panel for a seat that has `export_contest`). |
 | `consoleModel.ts` | Pure rules: pages by role, sidebar counts, queue tabs, status card numbers, category counts, award totals, owner workload and palette search. `consoleModel.test.ts` tests them. |
 | `consoleProps.ts` | `ConsolePageProps`, which every page receives, and the heading id. |
 
@@ -392,7 +392,7 @@ These rules apply:
 | `EventConsole.tsx` | The page, the header with the event code, and the tabs. |
 | `useEventConsole.ts` | The console read, the commands and the credential issue. It keeps the last overview when a read fails. A retry after a lost answer sends the same request ID. It reads again when the window regains focus. |
 | `PeopleTabs.tsx` | `PeopleTab` (**Add people**, the **Event admin** switch, username changes, **Issue password** and **Reset password**) and `EntrantsTab` (**Import entrants**, the team or single contestant kind, renames, **Add sign-in**). |
-| `ContestTabs.tsx` | `ContestsTab` (**Create a contest**, **Edit contest**, `LivePasswords`) and `AssignmentsTab` (entrants and staff of one contest, with roles and **Contest admin**). |
+| `ContestTabs.tsx` | `ContestsTab` (**Create a contest**, **Edit contest**, **Download archive**, `LivePasswords`) and `AssignmentsTab` (entrants and staff of one contest, with roles and **Contest admin**). |
 | `CredentialSheet.tsx` | The sign-in link, one row per account, **Copy all**, **Print sheets** and **Done**. Each password shows once. `ISSUE_BATCH` (`src/backend/contracts.ts`) limits one request to eight accounts, so a larger issue runs in batches. |
 | `ScheduleFields.tsx`, `scheduleForm.ts` | The start, end and grace fields, in the event's time zone. |
 | `eventModel.ts` | Pure rules: the pasted `name, username` lines (`parsePersonLines`), the entrant kinds that a contest type accepts, `issueBatches`, and the contests that a live password also opens (`alsoOpens`, `voidedBy`). `eventModel.test.ts` tests them. |
@@ -402,14 +402,61 @@ These rules apply:
 
 These rules apply:
 
-- An archived event disables every control.
+- An archived event disables every control, except **Download archive**. That button only reads. Today only a deletion archives an event, and the Worker then refuses the read.
 - A new person or entrant has no password until the credential sheet issues one. The sheet opens after the import.
 - A live contest stays closed until every sign-in has a live password. `LivePasswords` shows **Waiting for live passwords** with the count and **Issue live passwords for** the contest. It also lists the other live contests that the new passwords open.
 - A command that would close reporting in an open live contest asks first. `closeReporting` carries the answer.
 
+## Contest archive
+
+**Download archive** gives staff one zip file of a contest's support record and its images, so the record survives outside Minsky. Export is allowed at any time. The webmaster's deletion of an event does not wait for an export, so each contest needs its download first.
+`ContestArchiveButton` (`src/connected/ContestArchiveButton.tsx`) is the only control. It stands on each contest row of the event console, and in the **Archive** panel of **Session settings** in the desktop console. The panel shows only when `can(seat, "export_contest")` holds. The server checks that capability again.
+
+The browser builds the zip. The Worker has a CPU limit of 1,000 ms, and a zip costs about 1.9 ms of CPU for each MiB, while one issue can hold 120 MB of images. So the Worker gives one read, and the browser does the rest:
+
+1. `backend.manage.contestRecord(sessionId)` reads `GET /api/contest-record`. It parses the reply with `contestRecordSchema` (`src/connected/contestRecord.ts`). The record keeps every row: internal notes, withdrawn awards, removed announcements, removed images, and the whole audit.
+2. `buildContestArchive` (`src/connected/buildContestArchive.ts`) downloads each image through the routes that the screens use. Issue images use `backend.images.download`. Announcement images use `backend.announcements.downloadImage`. Three images download at the same time, and they enter the zip in a fixed order. The builder checks each image against its stored SHA-256 digest. An image that fails to download, or does not match, is skipped and listed as missing. The archive still completes.
+3. The builder writes the zip with fflate. Text files use `ZipDeflate` and images use `ZipPassThrough`, because they are compressed already. Output chunks stay in a list of Blob parts, and one Blob is built at the end. fflate writes no ZIP64, so a contest with more than 4 GB of images gets an error and no file.
+4. `ContestArchiveButton` saves the Blob with an object URL and a link with `download`. The URL is revoked after 60 seconds.
+
+The builder and fflate load on the first click. No screen carries them. `npm run perf:size` lists them as lazy chunks. The record schema stays in the backend chunk.
+
+| File | Content |
+| --- | --- |
+| `contestArchive.ts` | Pure layout. `archiveEntries(record)` returns every file except `README.txt` and `manifest.json`. `imageEntries` places images. `teamViews` builds the record of each team in one pass. `readmeEntry` and `manifestEntry` run after the images. |
+| `contestArchiveLog.ts` | `renderLog` writes `log.html`. The `html` template escapes every value. The page has inline CSS, no script, and a Content-Security-Policy that forbids scripts. |
+| `contestArchiveCsv.ts` | `issues.csv` and `awards.csv`. RFC 4180 quoting, a byte order mark, and a leading apostrophe for a cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return. |
+| `archiveFormat.ts` | Times in the event time zone plus ISO, `safeName` and `slug`. |
+| `contestRecordFixture.ts` | A fictional record for tests. |
+
+The zip has one root folder, `minsky-<event code or event>-<contest slug>-<YYYYMMDD>`. The date is the export day in the event time zone. Paths below are relative to it.
+
+| Path | Content |
+| --- | --- |
+| `README.txt` | What each file is, the format version, the export time, a warning about staff-only content, and the missing files. |
+| `manifest.json` | The format, the record format, the counts of each record section, every file with its size and SHA-256 digest, and the missing files. |
+| `staff-only/record.json` | The whole record, pretty-printed. |
+| `staff-only/log.html` | Every issue in number order with its whole timeline. Internal notes have the label **Staff note**. It also holds resolutions, awards with the withdrawn ones, contest-wide awards, announcements with the removed ones, the images of each issue, and the audit. |
+| `staff-only/issues.csv`, `staff-only/awards.csv` | One row for each issue. One row for each award, with a `status` of `pending`, `applied` or `withdrawn`. |
+| `staff-only/images/issue-<NNNN>/<id8>-<name>` | Ready images with staff-only visibility. |
+| `staff-only/announcements/<id8>-<name>` | Images of removed announcements. |
+| `contestant-visible/teams/<team>/log.html` | What that team could see. It holds the issues of the team with the public timeline, the resolutions, and the awards that are not withdrawn. It also holds the contest-wide awards that staff confirmed and the announcements that are not removed, because every team saw them. A team with no issues still has a log. |
+| `contestant-visible/teams/<team>/images/issue-<NNNN>/<id8>-<name>` | Ready images with team visibility, of the issues of that team. |
+| `contestant-visible/announcements/<id8>-<name>` | Images of announcements that are not removed. Every team log links to them, so the zip holds one copy. |
+
+`<team>` is the slug of the team name, a hyphen, and the first 8 characters of the team ID. A name that reduces to nothing becomes `team`. If two teams still get the same folder name, the second one ends with `-2`. The teams are sorted first, so a team keeps its number on every export. `README.txt` lists each team folder with the team name and location.
+
+`teamViews(record)` builds the view of each team from the record before any file is rendered. So no renderer can put an internal note, a staff-only image, the audit, a withdrawn award record, a removed announcement, or an issue of another team into the folder of a team. The public timeline keeps the lines that announced an award and its withdrawal, because contestants saw them in the app. An announcement image whose announcement the record lacks goes to `staff-only/`. A team-visible image whose issue team the record lacks goes to `staff-only/` too. An image that is not `ready` has no file. The logs and `record.json` list it as metadata.
+
+To give a team its record, copy `contestant-visible/`, then delete the other teams' folders from `teams/`. The team log opens announcement images with the relative path `../../announcements/`, so the `announcements/` folder must stay beside `teams/`. `teamViews` reads each table once for all teams. Every team log still repeats the shared rows, the announcements and the confirmed contest-wide awards, so the size of the team logs grows with the number of teams times the shared rows.
+
+`<id8>` is the first 8 characters of the image ID. `safeName` removes control characters, path separators, characters that Windows refuses, `..`, leading dots, and trailing dots and spaces. It caps the length and keeps a short extension. A path that equals an earlier path, ignoring case, gets a number.
+
+`src/connected/contestArchive.test.ts` and `src/connected/buildContestArchive.test.ts` test the files and the zip. `tests/contest-archive.spec.ts` tests the button in a browser and unzips the file that the browser saved. It answers `/api/contest-record` with a fixed record, so it does not test the Worker route.
+
 ## Site dashboard
 
-`SiteDashboard` (`src/site/SiteDashboard.tsx`) is the webmasters' page at `/site`. It shows the calendar of every event, **Create an event**, the event list with **Open console**, the webmasters, and the setting **Webmasters read contest data only after joining**. While that setting is on, `JoinContests` lists the contests to join.
+`SiteDashboard` (`src/site/SiteDashboard.tsx`) is the webmasters' page at `/site`. It shows the calendar of every event, **Create an event**, the event list with **Open console**, the webmasters, and the setting **Webmasters read contest data only after joining**. While that setting is on, `JoinContests` lists the contests to join. `DeleteEventDialog` asks for the event's name, or its code when it has no name, before it deletes an event. It tells the webmaster to download the archive of each contest first, and it links to `/event/<id>`. The link never blocks or disables the deletion.
 
 | File | Content |
 | --- | --- |

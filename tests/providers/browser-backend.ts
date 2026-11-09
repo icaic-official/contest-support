@@ -250,6 +250,7 @@ export async function createBrowserBackend(
     manage: {
       site: unsupported,
       event: (eventId) => call({ type: 'event', ...(eventId === undefined ? {} : { eventId }) }),
+      contestRecord: unsupported,
       execute: (requestId, command) => call({ type: 'manage', requestId, command }),
       issueCredentials: (requestId, input) => call({ type: 'issue', requestId, input }),
     },

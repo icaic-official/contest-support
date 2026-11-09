@@ -37,9 +37,10 @@ This page is the reference for the behavior. The database and the code call a co
   **Remove announcement** removes it. **Keep announcement** closes the prompt.
   When the prompt opens, focus moves to **Keep announcement**. When the prompt closes, focus returns to **Remove**. After a removal, focus moves to **New announcement**.
 - A removed announcement leaves the strip for every member, managers included. Nobody can open its images in the app.
+  A contest admin can still download a ready image of a removed announcement through the image route, so that the contest archive can hold it. No other member can.
 - Minsky keeps the record of a removed announcement: its text, attribution, images, stored files, and the removal actor and time.
   Nobody can edit it, add images to it, or remove its images.
-  Minsky has no export of the contest log yet.
+  The [contest archive](event-platform-design.md#contest-archive) holds these records.
 - An archived event stays readable and rejects every announcement and image write.
 - Outside this feature: text history, read receipts, targeted audiences, scheduled publication, and push notifications.
 

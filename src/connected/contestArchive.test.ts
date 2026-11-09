@@ -137,10 +137,11 @@ describe("contestant-visible files", () => {
     expect(staffOnly.map((entry) => (entry.kind === "image" ? entry.imageId : ""))).toContain(ids.image(2));
   });
 
-  it("hold no withdrawn award, unconfirmed contest award, or removed announcement", () => {
-    for (const hidden of ["Test award", "Withdrawn contest award", "Pending contest award", "Wrong room", "wrong room.png", "withdrawn"]) {
+  it("hold no withdrawn award record, unconfirmed contest award, or removed announcement", () => {
+    for (const hidden of ["Withdrawn contest award", "Pending contest award", "Wrong room", "wrong room.png"]) {
       expect(visibleText, hidden).not.toContain(hidden);
     }
+    expect(visibleText).not.toContain("Withdrawn by");
     expect(visible.map((entry) => entry.path).join("\n")).not.toContain(id8(ids.image(12)));
   });
 

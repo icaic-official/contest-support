@@ -93,7 +93,7 @@ Use the desktop console. The phone app has no archive button.
 2. Select **Download archive**. The browser reads the record, then downloads the images one by one. The text under the button counts the images.
 3. Keep the page open until the text says **Archive downloaded**. The browser then saves a file such as `minsky-xxxx-2026-final-round-20261108.zip`.
 
-The browser builds the zip file on your device, so a contest with many images needs free space and memory on that device.
+The browser builds the zip file on your device, so a contest with many images needs free space and memory on that device. A contest with more than 4 GB of images cannot go into one archive. The button then shows an error before it downloads anything.
 If an image cannot be downloaded, or its bytes do not match the stored checksum, the archive leaves that image out and still downloads. The text under the button says how many images are missing. `manifest.json` and `README.txt` name each one. Select **Download archive** again to try once more.
 
 The archive has two folders. The folder names say who may read the content.

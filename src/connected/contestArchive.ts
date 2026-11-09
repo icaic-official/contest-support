@@ -2,7 +2,6 @@ import { awardsCsv, issuesCsv } from "./contestArchiveCsv.ts";
 import { type Audience, type ImageLinks, renderLog } from "./contestArchiveLog.ts";
 import type { ContestRecord } from "./contestRecord.ts";
 import { compactDate, safeName, slug, stampText } from "./archiveFormat.ts";
-import { workflowEvent } from "./historyEvents.ts";
 
 /**
  * The files of a contest archive, as pure data. `buildContestArchive` fetches the
@@ -88,27 +87,14 @@ const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
  * What a contestant could read. A withdrawn issue award, a contest-wide award
  * that staff did not confirm or that they withdrew, a removed announcement, a staff-only image
  * and an image that has no stored file are out, and so are the internal notes, the members, and the audit.
- * The history entries that record a withdrawn award go too.
+ * The public history keeps its award lines, as the contestant app shows them.
  */
 export function contestantView(record: ContestRecord): ContestRecord {
-  const issues = new Map(record.issues.map((issue) => [issue.id, issue]));
-  const withdrawn = record.awards.filter((award) => award.withdrawn_at);
-  const recordsWithdrawnAward = (entry: ContestRecord["history"][number]): boolean => {
-    const issue = issues.get(entry.issue_id);
-    if (!issue || !/awarded: |^Time award withdrawn/u.test(entry.text)) return false;
-    const award = withdrawn.find((item) => item.issue_id === issue.id && Date.parse(item.at) === Date.parse(entry.at));
-    const event = workflowEvent(entry, {
-      issue,
-      resolutions: record.resolutions.filter((resolution) => resolution.issue_id === issue.id),
-      award,
-    });
-    return event?.kind === "withdrawn" || (event?.kind === "awarded" && award !== undefined);
-  };
   const shown = new Set(record.announcements.filter((announcement) => !announcement.removed_at).map((a) => a.id));
   return {
     ...record,
     members: [],
-    history: record.history.filter((entry) => entry.visibility === "public" && !recordsWithdrawnAward(entry)),
+    history: record.history.filter((entry) => entry.visibility === "public"),
     awards: record.awards.filter((award) => !award.withdrawn_at),
     contest_awards: record.contest_awards.filter((award) => award.applied_at && !award.withdrawn_at),
     announcements: record.announcements.filter((announcement) => shown.has(announcement.id)),

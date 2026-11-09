@@ -55,7 +55,7 @@ const issueColumns: readonly Column<IssueRow>[] = [
 /** One row for each issue, in number order. */
 export function issuesCsv(record: ContestRecord): string {
   const teams = new Map(record.teams.map((team) => [team.id, team.name]));
-  // One pass over each table: a large contest has thousands of issues and tens of thousands of history rows.
+  // Count in one pass over each table. A large contest has thousands of issues and tens of thousands of history rows.
   const counts = new Map(record.issues.map((issue) => [issue.id, { resolutions: 0, reopened: 0, messages: 0, notes: 0, images: 0 }]));
   for (const resolution of record.resolutions) {
     const count = counts.get(resolution.issue_id);
@@ -74,7 +74,11 @@ export function issuesCsv(record: ContestRecord): string {
   }
   const rows = [...record.issues]
     .sort((a, b) => a.number - b.number)
-    .map((issue): IssueRow => ({ issue, team: nameOf(teams, issue.team_id), ...counts.get(issue.id)! }));
+    .map((issue): IssueRow => ({
+      issue,
+      team: nameOf(teams, issue.team_id),
+      ...(counts.get(issue.id) ?? { resolutions: 0, reopened: 0, messages: 0, notes: 0, images: 0 }),
+    }));
   return csv(issueColumns, rows);
 }
 

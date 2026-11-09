@@ -89,8 +89,8 @@ No production installation exists. Live-contest use and the [capacity targets](#
 
 - Contest admins, event admins, and webmasters can download one zip file that holds the support record of one contest and its images. A webmaster under the read restriction must join the contest first.
 - The archive keeps every record: issues, public replies, internal notes, history, resolutions, issue awards and contest-wide awards with withdrawn ones, announcements with removed ones, image details in every state, members, and the whole administration audit.
-- The file layout separates staff-only content from content that contestants could see. Contestant-visible files hold no internal notes, staff-only images, audit, withdrawn awards, or removed announcements.
-- The archive is available at any time, also after the event is archived. It is not available after a deletion starts. The deletion does not wait for it, and the delete dialog points to the event console to download it first.
+- The file layout separates staff-only content from content that contestants could see. Contestant-visible files hold no internal notes, staff-only images, audit, withdrawn award records, or removed announcements. Their timeline keeps the public lines that announced an award and its withdrawal, as the contestant app showed them.
+- The archive is available at any time until a deletion starts. The deletion does not wait for it, and the delete dialog points to the event console to download it first.
 - The browser builds the zip file. See [Contest archive](event-platform-design.md#contest-archive) for the reason.
 
 ### Announcements

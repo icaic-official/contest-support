@@ -402,7 +402,7 @@ These rules apply:
 
 These rules apply:
 
-- An archived event disables every control, except **Download archive**. That button only reads.
+- An archived event disables every control, except **Download archive**. That button only reads. Today only a deletion archives an event, and the Worker then refuses the read.
 - A new person or entrant has no password until the credential sheet issues one. The sheet opens after the import.
 - A live contest stays closed until every sign-in has a live password. `LivePasswords` shows **Waiting for live passwords** with the count and **Issue live passwords for** the contest. It also lists the other live contests that the new passwords open.
 - A command that would close reporting in an open live contest asks first. `closeReporting` carries the answer.
@@ -444,7 +444,7 @@ The zip has one root folder, `minsky-<event code or event>-<contest slug>-<YYYYM
 | `contestant-visible/images/issue-<NNNN>/<id8>-<name>` | Ready images with team visibility. |
 | `contestant-visible/announcements/<id8>-<name>` | Images of announcements that are not removed. |
 
-`contestantView` builds the contestant view from the record before any file is rendered. So no renderer can put an internal note, a staff-only image, the audit, a withdrawn award or a removed announcement into `contestant-visible/`. The history entries that record a withdrawn award are out too. An image that is not `ready` has no file. The logs and `record.json` list it as metadata.
+`contestantView` builds the contestant view from the record before any file is rendered. So no renderer can put an internal note, a staff-only image, the audit, a withdrawn award record, or a removed announcement into `contestant-visible/`. The public timeline keeps the lines that announced an award and its withdrawal, because contestants saw them in the app. An announcement image whose announcement the record lacks goes to `staff-only/`. An image that is not `ready` has no file. The logs and `record.json` list it as metadata.
 `<id8>` is the first 8 characters of the image ID. `safeName` removes control characters, path separators, characters that Windows refuses, `..`, leading dots, and trailing dots and spaces. It caps the length and keeps a short extension. A path that equals an earlier path, ignoring case, gets a number.
 
 `src/connected/contestArchive.test.ts` and `src/connected/buildContestArchive.test.ts` test the files and the zip. `tests/contest-archive.spec.ts` tests the button in a browser and unzips the file that the browser saved. It answers `/api/contest-record` with a fixed record, so it does not test the Worker route.

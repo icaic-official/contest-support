@@ -108,7 +108,7 @@ export const sections: readonly Section[] = [
 /** One row of a page: the row's JSON text, and the key columns that the next page continues from. */
 interface PageRow { row: string; k1?: D1Value; k2?: D1Value; k3?: D1Value }
 
-const refused = () => new AuthenticationError(403, 'Only contest admins can download the contest record.');
+const refused = () => new AuthenticationError(403, 'Only contest admins can download the contest record. Under the read restriction, a webmaster joins the contest first.');
 
 /**
  * The complete support record of one contest as JSON text, for the contest archive.

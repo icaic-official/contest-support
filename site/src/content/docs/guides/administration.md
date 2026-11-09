@@ -83,17 +83,17 @@ Uploads cannot be switched off.
 
 The contest archive is one zip file that holds the support record of one contest and its images. Keep a copy outside Minsky before a webmaster deletes the event. After a deletion starts, nobody can read the event, so nobody can download its archives.
 
-Contest admins, event admins, and webmasters can download the archive. Other staff cannot. If the site setting **Webmasters read contest data only after joining** is on, a webmaster must join the contest first. You can download the archive at any time, also while the contest runs and after the event is archived. An archive holds the record as it was at the moment you selected the button.
+Contest admins, event admins, and webmasters can download the archive. Other staff cannot. If the site setting **Webmasters read contest data only after joining** is on, a webmaster must join the contest first. You can download the archive at any time, also while the contest runs. If staff work in the contest during the download, the archive can hold some rows from before a change and some from after it. Download it after the contest ends for a consistent record.
 
 Use the desktop console. The phone app has no archive button.
 
 1. Open the archive control:
 	- As a contest admin, open **Session settings** in the console. The **Archive** panel is at the bottom.
 	- As an event admin or a webmaster, open [the event console](/guides/event-admin/) and select the **Contests** tab. Each contest has its own button.
-2. Select **Download archive**. The browser reads the record, then downloads the images one by one. The text under the button counts the images.
+2. Select **Download archive**. The browser reads the record, then downloads the images, three at a time. The text under the button counts the images.
 3. Keep the page open until the text says **Archive downloaded**. The browser then saves a file such as `minsky-xxxx-2026-final-round-20261108.zip`.
 
-The browser builds the zip file on your device, so a contest with many images needs free space and memory on that device. A contest with more than 4 GB of images cannot go into one archive. The button then shows an error before it downloads anything.
+The browser builds the zip file on your device, so a contest with many images needs free space and memory on that device. A contest with more than 4 GB of images cannot go into one archive. A contest with more than 65,000 files cannot either. The button then shows an error before it downloads any image.
 If an image cannot be downloaded, or its bytes do not match the stored checksum, the archive leaves that image out and still downloads. The text under the button says how many images are missing. `manifest.json` and `README.txt` name each one. Select **Download archive** again to try once more.
 
 The archive has two folders. The folder names say who may read the content.
@@ -107,7 +107,7 @@ The archive has two folders. The folder names say who may read the content.
 | `staff-only/issues.csv`, `staff-only/awards.csv` | One row for each issue, and one row for each award, for a spreadsheet. |
 | `staff-only/images/` | The staff-only images, in one folder for each issue. |
 | `staff-only/announcements/` | The images of removed announcements. |
-| `contestant-visible/log.html` | Only what the teams could see: public replies, resolutions, awards that were not withdrawn, confirmed contest-wide awards, and announcements that were not removed. |
+| `contestant-visible/log.html` | Only what the teams could see: public replies and the public timeline, resolutions, issue awards that were not withdrawn, confirmed contest-wide awards, and announcements that were not removed. |
 | `contestant-visible/images/`, `contestant-visible/announcements/` | The team-visible images and the images of announcements that were not removed. |
 
 The `staff-only` folder holds internal notes. Do not give it to contestants. You can give the `contestant-visible` folder to a team, but it holds the replies and images of every team in the contest.

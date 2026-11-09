@@ -112,11 +112,23 @@ describe("contest archive layout", () => {
     expect(safeName("trailing. . ")).toBe("trailing");
     expect(safeName('a<b>:c"d|e?f*g.png')).toBe("a_b__c_d_e_f_g.png");
     const long = safeName(`${"é".repeat(200)}.jpeg`);
-    expect(Array.from(long).length).toBeLessThanOrEqual(80);
+    expect(new TextEncoder().encode(long).length).toBeLessThanOrEqual(200);
     expect(long.endsWith(".jpeg")).toBe(true);
+    const wide = safeName(`${"\u{1F600}".repeat(200)}.png`);
+    expect(new TextEncoder().encode(wide).length, "4-byte characters").toBeLessThanOrEqual(200);
+    expect(wide.endsWith(".png")).toBe(true);
     expect(slug("Spring Finals 2026!", "x")).toBe("spring-finals-2026");
     expect(slug("☃", "contest")).toBe("contest");
     expect(slug("a".repeat(60), "x")).toHaveLength(40);
+  });
+});
+
+describe("announcement image placement", () => {
+  it("puts an image whose announcement the record lacks under staff-only", () => {
+    const record = fixtureRecord();
+    record.announcements = record.announcements.filter((announcement) => announcement.id !== ids.announcement(1));
+    const path = archiveEntries(record).find((entry) => entry.kind === "image" && entry.imageId === ids.image(11))?.path;
+    expect(path).toMatch(/^staff-only\/announcements\//u);
   });
 });
 

@@ -55,21 +55,26 @@ const issueColumns: readonly Column<IssueRow>[] = [
 /** One row for each issue, in number order. */
 export function issuesCsv(record: ContestRecord): string {
   const teams = new Map(record.teams.map((team) => [team.id, team.name]));
+  // One pass over each table: a large contest has thousands of issues and tens of thousands of history rows.
+  const counts = new Map(record.issues.map((issue) => [issue.id, { resolutions: 0, reopened: 0, messages: 0, notes: 0, images: 0 }]));
+  for (const resolution of record.resolutions) {
+    const count = counts.get(resolution.issue_id);
+    if (!count) continue;
+    count.resolutions++;
+    if (resolution.reopened_at) count.reopened++;
+  }
+  for (const entry of record.history) {
+    const count = counts.get(entry.issue_id);
+    if (count && entry.visibility === "public") count.messages++;
+    if (count && entry.visibility === "internal") count.notes++;
+  }
+  for (const image of record.issue_images) {
+    const count = counts.get(image.issue_id);
+    if (count) count.images++;
+  }
   const rows = [...record.issues]
     .sort((a, b) => a.number - b.number)
-    .map((issue): IssueRow => {
-      const history = record.history.filter((entry) => entry.issue_id === issue.id);
-      const resolutions = record.resolutions.filter((resolution) => resolution.issue_id === issue.id);
-      return {
-        issue,
-        team: nameOf(teams, issue.team_id),
-        resolutions: resolutions.length,
-        reopened: resolutions.filter((resolution) => resolution.reopened_at).length,
-        messages: history.filter((entry) => entry.visibility === "public").length,
-        notes: history.filter((entry) => entry.visibility === "internal").length,
-        images: record.issue_images.filter((image) => image.issue_id === issue.id).length,
-      };
-    });
+    .map((issue): IssueRow => ({ issue, team: nameOf(teams, issue.team_id), ...counts.get(issue.id)! }));
   return csv(issueColumns, rows);
 }
 

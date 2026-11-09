@@ -21,7 +21,9 @@ export function awardState(award: { applied_at: string | null; withdrawn_at: str
   return award.applied_at ? "applied" : "pending";
 }
 
-const MAX_NAME_LENGTH = 80;
+// File systems such as ext4 cap a name at 255 bytes. The archive adds an ID prefix and may add a number.
+const MAX_NAME_BYTES = 200;
+const utf8Length = (text: string) => new TextEncoder().encode(text).length;
 // Control characters and invisible format characters, such as zero-width spaces and bidirectional overrides, which hide what a name says.
 const invisible = /[\p{Cc}\p{Cf}]/gu;
 
@@ -29,7 +31,7 @@ const invisible = /[\p{Cc}\p{Cf}]/gu;
  * A file name that is safe on Windows, macOS, and Linux and cannot leave its
  * folder. It drops control characters, replaces path separators and the
  * characters that Windows refuses, removes `..`, leading dots, and trailing
- * dots and spaces, and caps the length but keeps a short extension.
+ * dots and spaces, and caps the UTF-8 length but keeps a short extension.
  */
 export function safeName(name: string, fallback = "file"): string {
   const cleaned = name
@@ -39,11 +41,11 @@ export function safeName(name: string, fallback = "file"): string {
     .trim()
     .replace(/^[. ]+/u, "")
     .replace(/[. ]+$/u, "");
-  const characters = Array.from(cleaned);
-  if (characters.length <= MAX_NAME_LENGTH) return cleaned || fallback;
+  if (utf8Length(cleaned) <= MAX_NAME_BYTES) return cleaned || fallback;
   const extension = /\.[\p{L}\p{N}]{1,8}$/u.exec(cleaned)?.[0] ?? "";
-  const kept = characters.slice(0, MAX_NAME_LENGTH - Array.from(extension).length).join("").replace(/[. ]+$/u, "");
-  return `${kept}${extension}` || fallback;
+  const characters = Array.from(cleaned.slice(0, cleaned.length - extension.length));
+  while (characters.length > 0 && utf8Length(characters.join("") + extension) > MAX_NAME_BYTES) characters.pop();
+  return `${characters.join("").replace(/[. ]+$/u, "")}${extension}` || fallback;
 }
 
 /** Lowercase letters, digits, and single hyphens, for the name of a folder. */

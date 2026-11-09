@@ -134,5 +134,14 @@ describe("buildContestArchive", () => {
     const huge = fixtureRecord();
     huge.issue_images[0]!.byte_size = 4_100_000_000;
     await expect(buildContestArchive(huge, serve, () => undefined)).rejects.toThrow("more than 4 GB");
+    const crowded = fixtureRecord();
+    const [issue, image] = [crowded.issues[0]!, crowded.issue_images[0]!];
+    const id = (prefix: string, index: number) => `${prefix}${index.toString(16).padStart(7, "0")}-0000-4000-8000-000000000000`;
+    // At most 24 images per issue, as the contest limits allow.
+    crowded.issues = Array.from({ length: 2_731 }, (_, index) => ({ ...issue, id: id("a", index), number: index + 1 }));
+    crowded.issue_images = Array.from({ length: 65_535 }, (_, index) => ({
+      ...image, id: id("b", index), issue_id: id("a", index % 2_731), byte_size: 1,
+    }));
+    await expect(buildContestArchive(crowded, serve, () => undefined)).rejects.toThrow("more than 65,000 files");
   });
 });

@@ -187,7 +187,7 @@ export function ContestsTab({ data, state }: TabProps) {
                   >
                     <Pencil aria-hidden="true" />
                   </Button>
-                  {/* Reading is allowed in an archived event, so this stays on when `locked`. */}
+                  {/* The download only reads, so `locked` does not apply. The Worker refuses it once a deletion starts. */}
                   <ContestArchiveButton contestId={contest.id} contestName={contest.name} />
                 </div>
                 {contest.waiting.length > 0 && (

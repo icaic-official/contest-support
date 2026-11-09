@@ -136,7 +136,7 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect((await get('/api/contest-record?sessionId=nope')).status).toBe(400);
     expect((await get('/api/contest-record')).status).toBe(400);
-    deps.contestRecord.read.mockRejectedValueOnce(new AuthenticationError(403, 'Only contest admins can download the contest record.'));
+    deps.contestRecord.read.mockRejectedValueOnce(new AuthenticationError(403, 'Only contest admins can download the contest record. Under the read restriction, a webmaster joins the contest first.'));
     expect((await get(`/api/contest-record?sessionId=${sessionId}`)).status).toBe(403);
     expect(deps.contestRecord.read).toHaveBeenCalledTimes(2);
   });

@@ -149,7 +149,7 @@ export function imageEntries(record: ContestRecord): ImageEntry[] {
     .sort((a, b) =>
       compareText(a.image.uploaded_at ?? "", b.image.uploaded_at ?? "") || compareText(a.image.id, b.image.id))
     .map(({ image, key }): ImageEntry => ({
-      path: place(announcementImageFolder(removed.get(image.announcement_id) ?? false), image.id, image.name),
+      path: place(announcementImageFolder(removed.get(image.announcement_id) ?? true), image.id, image.name),
       kind: "image",
       source: "announcement",
       key,
@@ -176,7 +176,7 @@ const folderNotes: ReadonlyArray<readonly [path: string, note: string]> = [
   [`${STAFF}/images/`, "Images that only staff could see, in one folder for each issue."],
   [`${STAFF}/announcements/`, "Images of announcements that staff removed."],
   [`${CONTESTANTS}/`, "Only what contestants could see. It covers every team. Do not give one team the issues of another team."],
-  [`${CONTESTANTS}/log.html`, "The issues with their public timeline, awards that staff confirmed, and announcements. Open it in a web browser."],
+  [`${CONTESTANTS}/log.html`, "The issues with their public timeline, the issue awards that were not withdrawn, the contest-wide awards that staff confirmed, and the announcements that were not removed. Open it in a web browser."],
   [`${CONTESTANTS}/images/`, "Images that the team could see, in one folder for each issue."],
   [`${CONTESTANTS}/announcements/`, "Images of announcements that staff did not remove."],
   [MANIFEST_PATH, "Every file with its size and SHA-256 digest, the number of rows of each kind in the record, and the files that this archive lacks."],

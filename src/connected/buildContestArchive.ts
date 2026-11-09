@@ -27,6 +27,7 @@ export interface BuiltArchive {
 const IMAGE_CONCURRENCY = 3;
 /** fflate writes no ZIP64, so one archive cannot pass 4 GB. */
 const ZIP_LIMIT_BYTES = 4_000_000_000;
+const ZIP_LIMIT_FILES = 65_535;
 
 async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -69,6 +70,10 @@ export async function buildContestArchive(
   const sizes = new Map([...record.issue_images, ...record.announcement_images].map((image) => [image.id, image.byte_size ?? 0]));
   if (images.reduce((sum, image) => sum + (sizes.get(image.imageId) ?? 0), 0) > ZIP_LIMIT_BYTES) {
     throw new Error("The images of this contest hold more than 4 GB. One zip file cannot hold them.");
+  }
+  // fflate writes 16-bit entry counts, so a larger zip would list fewer files than it holds.
+  if (entries.length + 2 > ZIP_LIMIT_FILES) {
+    throw new Error("This contest has more than 65,000 files. One zip file cannot hold them.");
   }
 
   const { Zip, ZipDeflate, ZipPassThrough } = await import("fflate");

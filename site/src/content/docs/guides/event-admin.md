@@ -182,7 +182,7 @@ Webmasters see the contests of every event on the **Site** page.
 
 ## Download contest archives
 
-On the **Contests** tab, each contest has a **Download archive** button. It saves one zip file with the contest's issues, replies, internal notes, awards, announcements, and images. The button works also after the event is archived. See [Download the contest archive](/guides/administration/#download-the-contest-archive) for the contents and the limits.
+On the **Contests** tab, each contest has a **Download archive** button. It saves one zip file with the contest's issues, replies, internal notes, awards, announcements, and images. See [Download the contest archive](/guides/administration/#download-the-contest-archive) for the contents and the limits.
 
 ## Recover a password
 

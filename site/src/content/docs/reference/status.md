@@ -20,6 +20,7 @@ These features are in `main`:
 - **Awards.** The jury records issue awards and contest-wide awards. Staff confirm each award separately after they apply it in the external contest system. Confirmed minutes extend a contestant's end time.
 - **Images.** Staff upload images with a fixed visibility, within limits for each contest.
 - **Announcements.** Contest admins and jury publish announcements with images.
+- **Contest archive.** Admins download one zip file with a contest's record and images. This was added after the check above.
 - **Other tools.** The app has team search, jury award lists, a calendar, and profile pictures.
 - **Interfaces.** The app has a contestant app for phones and laptops, a staff phone app, and a staff console.
 - **Backend.** Cloudflare is the only backend. It uses one Worker, D1, private R2, and a Durable Object.
@@ -49,6 +50,7 @@ These claims have no evidence yet:
 - The current installation procedure on a fresh hosted installation. See the [verification limit](/operators/installation/).
 - Webmaster recovery and the upgrade procedure on a hosted installation.
 - Announcements and their images on a hosted installation.
+- The contest archive on a hosted installation, and for a contest with many images.
 - Live updates in the [complete local run](/contributing/development/#run-the-complete-app-locally).
 
 Minsky needs a network connection.

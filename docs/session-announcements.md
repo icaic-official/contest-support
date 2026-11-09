@@ -40,7 +40,7 @@ This page is the reference for the behavior. The database and the code call a co
   A contest admin can still download a ready image of a removed announcement through the image route, so that the contest archive can hold it. No other member can.
 - Minsky keeps the record of a removed announcement: its text, attribution, images, stored files, and the removal actor and time.
   Nobody can edit it, add images to it, or remove its images.
-  Minsky has no export of the contest log yet.
+  The [contest archive](event-platform-design.md#contest-archive) holds these records.
 - An archived event stays readable and rejects every announcement and image write.
 - Outside this feature: text history, read receipts, targeted audiences, scheduled publication, and push notifications.
 

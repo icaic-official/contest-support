@@ -180,6 +180,10 @@ The calendar lists the scheduled contests of your event for seven days. It group
 Select **Previous week**, **Next week**, or **Today** to move. Select **Open** to switch to a contest. A contest without a schedule does not show.
 Webmasters see the contests of every event on the **Site** page.
 
+## Download contest archives
+
+On the **Contests** tab, each contest has a **Download archive** button. It saves one zip file with the contest's issues, replies, internal notes, awards, announcements, and images. The button works also after the event is archived. See [Download the contest archive](/guides/administration/#download-the-contest-archive) for the contents and the limits.
+
 ## Recover a password
 
 Minsky sends no email. A person who forgets a password asks an organizer.

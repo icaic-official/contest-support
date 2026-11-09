@@ -191,7 +191,7 @@ Expired and abandoned uploads also create deletion tasks for their exact keys. A
 
 [R2 object consistency](https://developers.cloudflare.com/r2/reference/consistency/) does not make a D1 change and an R2 write atomic. These states exist to cover that gap.
 
-Announcement images follow the same pattern under their own keys. Removing an announcement keeps its rows and objects for a future contest log export. See [contest announcements](session-announcements.md).
+Announcement images follow the same pattern under their own keys. Removing an announcement keeps its rows and objects for the contest archive. See [contest announcements](session-announcements.md).
 
 ## Account avatars use the private image bucket
 
@@ -298,4 +298,4 @@ Each installation must establish its own capacity and latency evidence before li
 
 ## What is not built
 
-No command archives or deletes an event. Every reader and writer honors `events.archived`, but only test fixtures set it today. The [event platform design](event-platform-design.md) describes the planned deletion. Announcement removal keeps its records, and no export of the contest log exists.
+No command archives an event on its own. Only the deletion fence sets `events.archived`. The [event platform design](event-platform-design.md) describes the deletion and the contest archive.

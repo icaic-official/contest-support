@@ -1,6 +1,6 @@
 ---
 title: Manage a contest
-description: Reset passwords, change usernames, edit team locations and categories, control intake, and set image limits for one contest.
+description: Reset passwords, change usernames, edit team locations and categories, control intake, set image limits, and download the archive of one contest.
 ---
 
 A contest admin manages one contest. Event admins and webmasters can do the same work.
@@ -78,6 +78,41 @@ Set these limits under **Issue images** and select **Save image limits**.
 
 The total must be at least the size of the largest image. Lower limits do not remove existing images.
 Uploads cannot be switched off.
+
+## Download the contest archive
+
+The contest archive is one zip file that holds the support record of one contest and its images. Keep a copy outside Minsky before a webmaster deletes the event. After a deletion starts, nobody can read the event, so nobody can download its archives.
+
+Contest admins, event admins, and webmasters can download the archive. Other staff cannot. If the site setting **Webmasters read contest data only after joining** is on, a webmaster must join the contest first. You can download the archive at any time, also while the contest runs and after the event is archived. An archive holds the record as it was at the moment you selected the button.
+
+Use the desktop console. The phone app has no archive button.
+
+1. Open the archive control:
+	- As a contest admin, open **Session settings** in the console. The **Archive** panel is at the bottom.
+	- As an event admin or a webmaster, open [the event console](/guides/event-admin/) and select the **Contests** tab. Each contest has its own button.
+2. Select **Download archive**. The browser reads the record, then downloads the images one by one. The text under the button counts the images.
+3. Keep the page open until the text says **Archive downloaded**. The browser then saves a file such as `minsky-xxxx-2026-final-round-20261108.zip`.
+
+The browser builds the zip file on your device, so a contest with many images needs free space and memory on that device.
+If an image cannot be downloaded, or its bytes do not match the stored checksum, the archive leaves that image out and still downloads. The text under the button says how many images are missing. `manifest.json` and `README.txt` name each one. Select **Download archive** again to try once more.
+
+The archive has two folders. The folder names say who may read the content.
+
+| Path | Content |
+| --- | --- |
+| `README.txt` | What each file holds, the export time, and the format version. |
+| `manifest.json` | The format version, counts for each kind of record, every file with its size and SHA-256 checksum, and the images that are missing. |
+| `staff-only/record.json` | The complete record in JSON: issues, replies, internal notes, resolutions, awards, contest-wide awards, announcements, image details, members, and the whole administration audit. Withdrawn awards, removed announcements, and removed images stay in it. |
+| `staff-only/log.html` | The same record as one page that a browser opens. Internal notes carry the label **Staff note**. |
+| `staff-only/issues.csv`, `staff-only/awards.csv` | One row for each issue, and one row for each award, for a spreadsheet. |
+| `staff-only/images/` | The staff-only images, in one folder for each issue. |
+| `staff-only/announcements/` | The images of removed announcements. |
+| `contestant-visible/log.html` | Only what the teams could see: public replies, resolutions, awards that were not withdrawn, confirmed contest-wide awards, and announcements that were not removed. |
+| `contestant-visible/images/`, `contestant-visible/announcements/` | The team-visible images and the images of announcements that were not removed. |
+
+The `staff-only` folder holds internal notes. Do not give it to contestants. You can give the `contestant-visible` folder to a team, but it holds the replies and images of every team in the contest.
+
+The archive names each member with a name and a username. It has no passwords and no profile pictures. A removed image appears only as a row with who removed it and when, because Minsky deleted its file.
 
 ## Check recent activity
 

@@ -526,6 +526,21 @@ The goal is a deletion that is complete across D1, R2, and Durable Objects, safe
 
 This is the deletion of one named event that the owner approved. It is not a shared-data reset, and it adds no persona control.
 
+### Contest archive
+
+Issue #116 asks for one download that keeps a contest's support record and media outside Minsky. The deletion fence makes every read of the event fail, so the archive must come before a deletion. The deletion does not wait for it (decision 6).
+
+- **Who.** `export_contest` in `capabilityRule` (`src/connected/capabilities.ts`) admits an admin staff seat: a contest admin, an event admin, or a webmaster. `D1ContestRecordService` (`src/server/adapters/cloudflare/contestRecord.ts`) reads the seat through `contestDataSql('caller')`, so the webmaster read restriction and `notBeingDeletedSql` apply. It checks the seat again after the last read, so access revoked during the read returns nothing.
+- **Unit.** One contest. An event's contests can overlap and end at different times. The delete dialog links to the event console, which has one button for each contest.
+- **When.** At any time. A practice contest can have no schedule, a hand override hides the `ended` intake reason, and personal end times differ by entrant. So no single "ended" test fits every contest. The record states `exported_at`.
+- **Read.** `GET /api/contest-record?sessionId=` returns JSON that parses with `contestRecordSchema` (`src/connected/contestRecord.ts`, format `minsky-contest-record`, version 1). Each table is read in keyset pages of 1,000 rows. Each row is one `json_object` text, and the Worker joins the text without parsing rows. D1 caps one value near 2 MB, so the snapshot's single `json_object` cannot hold a large contest.
+- **Zip.** The browser builds the zip with `fflate`, which loads on the first click. It fetches each image through `/api/image/` and `/api/announcement-image/`, which check access before and after the R2 read. It checks each image against its stored SHA-256 digest. An image that fails stays out of the zip and is listed in `manifest.json`. A contest admin can fetch a ready image of a removed announcement, so the archive can hold it.
+- **Layout.** `staff-only/` holds `record.json`, `log.html`, two CSV files, staff-only images, and images of removed announcements. `contestant-visible/` holds a log and the images that teams could see. `manifest.json` lists every file with its size and checksum.
+
+The Worker does not build the zip because of its configured CPU limit, `limits.cpu_ms: 1000` in `src/server/adapters/cloudflare/deploy/*.wrangler.jsonc`. A stored zip costs about 1.9 ms of CPU for each MiB in local Node 22 with `fflate`, a proxy for workerd. That makes about 500 MiB the most that one request could pack. One issue can hold 120 MB of images, and no limit applies to a whole contest. A job that writes the zip to R2 would need state, cleanup, and work split across many requests. The browser path adds no new route that serves image bytes.
+
+A local measurement of the read used a contest with 2,000 issues, 80,000 history rows, 2,000 audit rows, and 4,000 images, beside an event of the same size. Three runs took 1,385 to 1,605 ms of wall time and 103 D1 calls, read 212,555 rows, and returned 22,387,553 bytes. The Worker's own work, replayed from recorded pages without I/O, took about 80 to 120 ms of CPU and peaked at 42.8 MiB of memory above the baseline. So a record above roughly 50 to 60 MiB could exceed the 128 MB memory of an isolate. These are local numbers, not hosted D1. Four sections sort the contest's rows again for each page. A contest with 24,000 images read 900,001 rows for its image section.
+
 ### Live updates
 
 - One Durable Object per contest stays (`src/server/adapters/cloudflare/live.ts:301`). `access()` reads `contestDataSql('logins')`, so event admins and webmasters receive the `staff` audience without a membership.
@@ -537,7 +552,7 @@ This is the deletion of one named event that the owner approved. It is not a sha
 ### What this design deliberately does not do
 
 - It adds no problems, submissions, judging, scoreboard, payment, plans, self sign-up, email, SMTP, or public listing.
-- It adds no per-contest archive. The earlier Phase 7 with `contest_state` is dropped, because no 2026-10-27 decision asks for it. `events.archived` stays the read-only fence.
+- It adds no read-only state for one contest. The earlier Phase 7 with `contest_state` is dropped, because no 2026-10-27 decision asks for it. `events.archived` stays the read-only fence.
 - It rebuilds no table and drops no index. `reviewedDestructiveMigrations` stays empty.
 - It never stores a password and never changes a login key.
 - It runs no per-contest cron work. The cron gains one idle probe for open deletions.
@@ -873,7 +888,7 @@ The owner made these decisions on 2026-10-27, after the first draft of this desi
 3. **The override and the live gate.** **Open now**, **Close now**, and **Return to schedule** cannot open a live contest whose seats are not all ready. The live gate comes first in `intakeOpenSql`.
 4. **Reporting after the scheduled end.** A contestant with confirmed extra minutes may report until their personal end plus grace.
 5. **Single contestants.** They follow the live password rule, as teams do.
-6. **Deletion and export.** An event deletion does not wait for the contest support log export (issue #116). The typed confirmation names what is lost.
+6. **Deletion and export.** An event deletion does not wait for the contest support log export (issue #116). The typed confirmation names what is lost. The [contest archive](#contest-archive) now exists, and the delete dialog links to the event console, where admins download it.
 7. **Contest-wide awards.** They have no recipient exceptions. Each award gives minutes to every entry of the contest.
 8. **Existing contests.** Every existing development contest becomes a practice contest. The kind is fixed.
 9. **A webmaster's join.** It persists when the restriction is switched off and on again, because it was audited. A new join is refused while the restriction is off.

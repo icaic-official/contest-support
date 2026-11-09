@@ -89,6 +89,7 @@ Other failures leave the write outcome unknown, including an invalid success res
 | `event(eventId?)` | `GET /api/event` | Returns `EventConsole`: the event, its admins, people, entrants, contests, staff assignments, entries, and latest 50 audit entries. Requires an event admin of the event or a webmaster. Without an ID, it reads the caller's own event. |
 | `execute(requestId, command)` | `POST /api/manage` | Runs one `ManageCommand`. Returns a `ManageReceipt` with the created IDs. |
 | `issueCredentials(requestId, input)` | `POST /api/credentials` | Issues a temporary password for each of 1 to 8 accounts. |
+| `contestRecord(sessionId)` | `GET /api/contest-record` | Returns the complete `ContestRecord` of one contest for the [contest archive](event-platform-design.md#contest-archive). Requires a contest admin, an event admin, or a webmaster who can read the contest's data. |
 
 `requirementOf` in [manage.ts](../src/server/adapters/cloudflare/manage.ts) holds one row for each command. The levels have these meanings:
 
@@ -191,10 +192,10 @@ The [announcement reference](session-announcements.md) defines the behavior and 
 | Operation | Result |
 | --- | --- |
 | `snapshot(sessionId, signal?)` | Returns the announcements and ready images that the caller can read, with server time. Members read active records. Admins and jury also read expired records. Nobody reads removed records through this call. A newer read can abort an older one. |
-| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. Removal hides the announcement from every member and keeps its record, images, and files for a future contest log export. |
+| `execute(sessionId, requestId, command)` | Publishes, edits, or removes one announcement and returns its ID. Removal hides the announcement from every member and keeps its record, images, and files for the contest archive. |
 | `uploadImage(input)` | Reserves, transfers, and publishes one image. A repeated request ID does not add a second image. |
 | `removeImage(sessionId, imageId)` | Removes the image through the authorized server operation. A failed file deletion stays retryable. |
-| `downloadImage(image)` | Returns a `Blob` after the server checks current access. |
+| `downloadImage(image)` | Returns a `Blob` after the server checks current access. A contest admin can also download a ready image of a removed announcement. |
 
 `AnnouncementRejectedError` extends `WorkflowRejectedError`. It confirms that the server rejected the command.
 Its `conflict` field is true when the announcement changed after the caller read it.

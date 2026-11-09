@@ -629,7 +629,7 @@ It changes these files:
 | `src/server/adapters/cloudflare/application.ts` | Keeps `snapshot` and `contests`; access fragments move to `authority.ts`; admin methods move to `manage.ts` |
 | `src/server/adapters/d1/store.ts`, `src/server/workflow.ts` | `workflowSql` joins the resolver; `dependency` carries the stamp and the intake value; `decideWorkflow` reads `capabilityRule` |
 | `src/server/adapters/cloudflare/authentication.ts`, `src/server/authenticationHttp.ts` | Sign-in by event code or site and handle; the limiter key; account commands leave for `manage.ts` and `credentials.ts`; `createLogin` is unchanged |
-| `src/server/adapters/cloudflare/http.ts`, `applicationWorker.ts` | Routes `/api/contests`, `/api/site`, `/api/event`, `/api/manage`, `/api/credentials`, `/api/contest-awards`; cron task `advance-deletions` |
+| `src/server/adapters/cloudflare/http.ts`, `applicationWorker.ts` | Routes `/api/contests`, `/api/site`, `/api/event`, `/api/manage`, `/api/credentials`, `/api/contest-awards`, `/api/contest-record`; cron task `advance-deletions` |
 | `src/server/adapters/cloudflare/live.ts` | `access()` through the resolver; `/erase` replaces `cleanup()` |
 | `announcements.ts`, `images.ts`, `announcementImages.ts`, `avatars.ts` | Their access copies become `contestDataSql`; `PrivateBucket` (`src/server/adapters/cloudflare/images.ts:18-27`) gains `list` |
 | `src/server/adapters/cloudflare/installation.ts`, `tooling/install.mjs`, `tooling/configuration.mjs` | `bootstrapSite` and `recoverWebmaster` by site handle; the competition file becomes a site file |

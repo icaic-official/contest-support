@@ -3,15 +3,15 @@ import { safeName, slug } from "./archiveFormat";
 import {
   archiveEntries,
   archiveRoot,
-  contestantView,
   imageEntries,
   manifestEntry,
   readmeEntry,
+  teamView,
   type ArchiveEntry,
 } from "./contestArchive";
 import { awardsCsv, issuesCsv } from "./contestArchiveCsv";
 import type { ContestRecord } from "./contestRecord";
-import { fixtureRecord, ids, INTERNAL_NOTE } from "./contestRecordFixture";
+import { CEDAR_REPLY, fixtureRecord, ids, INTERNAL_NOTE } from "./contestRecordFixture";
 
 const text = (entries: readonly ArchiveEntry[], path: string): string => {
   const entry = entries.find((item) => item.path === path);
@@ -20,6 +20,8 @@ const text = (entries: readonly ArchiveEntry[], path: string): string => {
 };
 
 const id8 = (id: string) => id.slice(0, 8);
+const aurora = `contestant-visible/teams/aurora-${id8(ids.teamA)}`;
+const cedar = `contestant-visible/teams/cedar-${id8(ids.teamB)}`;
 
 describe("contest archive layout", () => {
   it("names the root from the event code, the contest, and the export day in the event zone", () => {
@@ -42,9 +44,11 @@ describe("contest archive layout", () => {
       "staff-only/log.html",
       "staff-only/issues.csv",
       "staff-only/awards.csv",
-      "contestant-visible/log.html",
-      `contestant-visible/images/issue-0001/${id8(ids.image(1))}-loose cable.png`,
+      `${aurora}/log.html`,
+      `${cedar}/log.html`,
+      `${aurora}/images/issue-0001/${id8(ids.image(1))}-loose cable.png`,
       `staff-only/images/issue-0001/${id8(ids.image(2))}-_stock room.jpg`,
+      `${cedar}/images/issue-0007/${id8(ids.image(4))}-projector.png`,
       `contestant-visible/announcements/${id8(ids.image(11))}-menu.webp`,
       `staff-only/announcements/${id8(ids.image(12))}-wrong room.png`,
     ]);
@@ -71,10 +75,10 @@ describe("contest archive layout", () => {
     record.issue_images.push({ ...template, id: "20000000-0000-4000-8000-000000000000", original_path: null });
     record.announcement_images.push({ ...record.announcement_images[0]!, id: "30000000-0000-4000-8000-000000000000", state: "deleted" });
     const files = imageEntries(record);
-    expect(files.map((file) => file.imageId)).toEqual([ids.image(1), ids.image(2), ids.image(11), ids.image(12)]);
+    expect(files.map((file) => file.imageId)).toEqual([ids.image(1), ids.image(2), ids.image(4), ids.image(11), ids.image(12)]);
     // The logs still list the other rows as metadata.
     expect(text(archiveEntries(record), "staff-only/log.html")).toContain("No file in this archive.");
-    expect((JSON.parse(text(archiveEntries(record), "staff-only/record.json")) as ContestRecord).issue_images).toHaveLength(9);
+    expect((JSON.parse(text(archiveEntries(record), "staff-only/record.json")) as ContestRecord).issue_images).toHaveLength(10);
   });
 
   it("keeps hostile and colliding names inside their folder and unique, even ignoring case", () => {
@@ -132,11 +136,84 @@ describe("announcement image placement", () => {
   });
 });
 
-describe("contestant-visible files", () => {
+describe("team folders", () => {
+  const withTeams = (teams: Array<{ id: string; name: string }>, owners: string[]): ContestRecord => {
+    const record = fixtureRecord();
+    record.teams = teams.map((team) => ({ ...record.teams[0]!, ...team }));
+    record.issues = record.issues.map((issue, index) => ({ ...issue, team_id: owners[index] ?? teams[0]!.id }));
+    return record;
+  };
+  const folders = (record: ContestRecord) =>
+    archiveEntries(record).flatMap((entry) => (entry.path.endsWith("/log.html") && entry.path.includes("/teams/") ? [entry.path.split("/")[2]!] : []));
+
+  it("names a folder from the team's name and the start of its ID", () => {
+    expect(folders(fixtureRecord())).toEqual([`aurora-${id8(ids.teamA)}`, `cedar-${id8(ids.teamB)}`]);
+  });
+
+  it("keeps two teams with one name apart, even when their IDs start alike", () => {
+    const first = "00000005-0000-4000-8000-0000000000a1";
+    const second = "00000005-0000-4000-8000-0000000000a2";
+    const record = withTeams([{ id: first, name: "Aurora" }, { id: second, name: "Aurora" }], [first, second, first]);
+    // The smaller ID keeps the plain name, whatever the order of the rows.
+    for (const teams of [record.teams, [...record.teams].reverse()]) {
+      const entries = archiveEntries({ ...record, teams });
+      expect(folders({ ...record, teams })).toEqual(["aurora-00000005", "aurora-00000005-2"]);
+      const [one, two] = ["aurora-00000005", "aurora-00000005-2"].map((folder) => text(entries, `contestant-visible/teams/${folder}/log.html`));
+      expect(one).toContain("ISS-1:");
+      expect(one).toContain("ISS-12:");
+      expect(one).not.toContain("ISS-7:");
+      expect(two).toContain("ISS-7:");
+      expect(two).not.toContain("ISS-1:");
+    }
+  });
+
+  it("stays inside the teams folder for a hostile or empty name", () => {
+    const names = ["../../etc", "Team/One\\Two", "日本語チーム", "  ", "A".repeat(300), "con?", "x\u0000y"];
+    const record = fixtureRecord();
+    record.teams = names.map((name, index) => ({ ...record.teams[0]!, id: `0000000${index}-0000-4000-8000-000000000000`, name }));
+    expect(folders(record)).toEqual([
+      `${"a".repeat(40)}-00000004`,
+      "con-00000005",
+      "etc-00000000",
+      "team-00000002",
+      "team-00000003",
+      "team-one-two-00000001",
+      "x-y-00000006",
+    ]);
+  });
+
+  it("gives a team with no issues a log with the announcements and the confirmed contest awards", () => {
+    const record = fixtureRecord();
+    const quiet = "00000009-0000-4000-8000-000000000000";
+    record.teams.push({ ...record.teams[0]!, id: quiet, name: "Dune", location: "Hall D" });
+    const entries = archiveEntries(record);
+    const log = text(entries, `contestant-visible/teams/dune-${id8(quiet)}/log.html`);
+    expect(log).toContain("No issues.");
+    expect(log).not.toContain("ISS-");
+    expect(log).toContain("Lunch at noon");
+    expect(log).toContain("Network outage in Hall A");
+    expect(log).not.toContain("Pending contest award");
+    expect(log).not.toContain("Aurora");
+    expect(log).not.toContain("Cedar");
+    expect(entries.filter((entry) => entry.path.includes(`dune-${id8(quiet)}/images/`))).toEqual([]);
+  });
+
+  it("gives an image to the staff folder when its issue's team is missing from the record", () => {
+    const record = fixtureRecord();
+    record.teams = record.teams.filter((team) => team.id !== ids.teamB);
+    const path = imageEntries(record).find((entry) => entry.imageId === ids.image(4))?.path;
+    expect(path).toMatch(/^staff-only\/images\/issue-0007\//u);
+  });
+});
+
+describe("team logs", () => {
   const entries = archiveEntries(fixtureRecord());
   const visible = entries.filter((entry) => entry.path.startsWith("contestant-visible/"));
   const staffOnly = entries.filter((entry) => entry.path.startsWith("staff-only/"));
   const visibleText = visible.flatMap((entry) => (entry.kind === "text" ? [entry.text] : [])).join("\n");
+  const auroraLog = text(entries, `${aurora}/log.html`);
+  const cedarLog = text(entries, `${cedar}/log.html`);
+  const folderPaths = (folder: string) => entries.filter((entry) => entry.path.startsWith(`${folder}/`)).map((entry) => entry.path);
 
   it("never hold an internal note, a staff-only image, or the audit", () => {
     expect(visibleText).not.toContain(INTERNAL_NOTE);
@@ -157,8 +234,11 @@ describe("contestant-visible files", () => {
     expect(visible.map((entry) => entry.path).join("\n")).not.toContain(id8(ids.image(12)));
   });
 
-  it("hold the public timeline, confirmed awards, announcements, and team images", () => {
+  it("hold the public timeline, confirmed awards, announcements, and images of their own team", () => {
     for (const shown of [
+      "ISS-1:",
+      "ISS-12:",
+      "Monitor flickers",
       "I will bring a new cable.",
       "Replaced the cable",
       "Lost time while waiting",
@@ -168,16 +248,53 @@ describe("contestant-visible files", () => {
       "loose cable.png",
       "Spring finals",
     ]) {
-      expect(visibleText, shown).toContain(shown);
+      expect(auroraLog, shown).toContain(shown);
     }
-    expect(visible.map((entry) => entry.path)).toContain(`contestant-visible/images/issue-0001/${id8(ids.image(1))}-loose cable.png`);
+    for (const shown of ["ISS-7:", CEDAR_REPLY, "projector.png", "Network outage in Hall A", "Lunch at noon", "Spring finals"]) {
+      expect(cedarLog, shown).toContain(shown);
+    }
+    expect(folderPaths(aurora)).toEqual([
+      `${aurora}/log.html`,
+      `${aurora}/images/issue-0001/${id8(ids.image(1))}-loose cable.png`,
+    ]);
+    expect(folderPaths(cedar)).toEqual([
+      `${cedar}/log.html`,
+      `${cedar}/images/issue-0007/${id8(ids.image(4))}-projector.png`,
+    ]);
   });
 
-  it("is a view that drops rows and keeps the issues", () => {
-    const record = fixtureRecord();
-    const view = contestantView(record);
-    expect(view.issues).toEqual(record.issues);
+  it("keep the issues, replies, and images of one team out of the folder of another", () => {
+    for (const other of ["ISS-7:", "HYPERLINK", CEDAR_REPLY, "projector.png", "Cedar", "Hall B, desk 4", id8(ids.image(4))]) {
+      expect(auroraLog, other).not.toContain(other);
+    }
+    for (const other of ["ISS-1:", "ISS-12:", "Monitor flickers", "I will bring a new cable.", "Replaced the cable", "Lost time while waiting", "loose cable.png", "Aurora", "Hall A, desk 12", id8(ids.image(1))]) {
+      expect(cedarLog, other).not.toContain(other);
+    }
+    expect(folderPaths(aurora).join("\n")).not.toContain("projector");
+    expect(folderPaths(cedar).join("\n")).not.toContain("loose cable");
+  });
+
+  it("share one copy of each announcement image, which every team log links to", () => {
+    const shared = `contestant-visible/announcements/${id8(ids.image(11))}-menu.webp`;
+    expect(entries.map((entry) => entry.path).filter((path) => path.includes(id8(ids.image(11))))).toEqual([shared]);
+    for (const log of [auroraLog, cedarLog]) expect(log).toContain(`href="../../announcements/${id8(ids.image(11))}-menu.webp"`);
+  });
+
+  it("have no contestant-visible log outside the team folders", () => {
+    expect(visible.map((entry) => entry.path).filter((path) => path.endsWith("log.html"))).toEqual([`${aurora}/log.html`, `${cedar}/log.html`]);
+  });
+});
+
+describe("the view of one team", () => {
+  const record = fixtureRecord();
+
+  it("keeps the issues of that team and drops every other row that the team could not see", () => {
+    const view = teamView(record, ids.teamA);
+    expect(view.teams.map((team) => team.id)).toEqual([ids.teamA]);
+    expect(view.issues.map((issue) => issue.number)).toEqual([1, 12]);
     expect(view.history.every((entry) => entry.visibility === "public")).toBe(true);
+    expect(view.history.every((entry) => [ids.issue(1), ids.issue(12)].includes(entry.issue_id))).toBe(true);
+    expect(view.resolutions.map((resolution) => resolution.summary)).toEqual(["Replaced the cable"]);
     expect(view.members).toEqual([]);
     expect(view.audit).toEqual([]);
     expect(view.contest_awards.map((award) => award.explanation)).toEqual(["Network outage in Hall A"]);
@@ -186,6 +303,24 @@ describe("contestant-visible files", () => {
     expect(view.issue_images.map((image) => image.id)).toEqual([ids.image(1)]);
     expect(view.announcement_images.map((image) => image.id)).toEqual([ids.image(11)]);
     expect(record.history.some((entry) => entry.visibility === "internal")).toBe(true);
+  });
+
+  it("gives the other team its own rows, and the shared rows too", () => {
+    const view = teamView(record, ids.teamB);
+    expect(view.issues.map((issue) => issue.number)).toEqual([7]);
+    expect(view.history.map((entry) => entry.text)).toContain(CEDAR_REPLY);
+    expect(view.awards).toEqual([]);
+    expect(view.resolutions).toEqual([]);
+    expect(view.issue_images.map((image) => image.id)).toEqual([ids.image(4)]);
+    expect(view.announcements.map((announcement) => announcement.title)).toEqual(["Lunch at noon"]);
+  });
+
+  it("holds nothing of an issue for a team that has none, and does not change the record", () => {
+    const copy = structuredClone(record);
+    const view = teamView(record, "00000009-0000-4000-8000-000000000000");
+    expect([view.teams, view.issues, view.history, view.resolutions, view.awards, view.issue_images]).toEqual([[], [], [], [], [], []]);
+    expect(view.announcements).toHaveLength(1);
+    expect(record).toEqual(copy);
   });
 });
 
@@ -208,13 +343,12 @@ describe("staff-only files", () => {
     expect(log).toContain("External application confirmed");
     expect(log.indexOf("ISS-1:")).toBeLessThan(log.indexOf("ISS-7:"));
     expect(log.indexOf("ISS-7:")).toBeLessThan(log.indexOf("ISS-12:"));
-    expect(log).toContain(`href="../contestant-visible/images/issue-0001/${id8(ids.image(1))}-loose%20cable.png"`);
+    expect(log).toContain(`href="../${aurora}/images/issue-0001/${id8(ids.image(1))}-loose%20cable.png"`);
+    expect(log).toContain(`href="../${cedar}/images/issue-0007/${id8(ids.image(4))}-projector.png"`);
     expect(log).toContain(`href="images/issue-0001/${id8(ids.image(2))}-_stock%20room.jpg"`);
     expect(log).toContain(`href="announcements/${id8(ids.image(12))}-wrong%20room.png"`);
-    const contestantLog = text(entries, "contestant-visible/log.html");
-    expect(contestantLog).toContain(`href="images/issue-0001/${id8(ids.image(1))}-loose%20cable.png"`);
-    expect(contestantLog).toContain(`href="announcements/${id8(ids.image(11))}-menu.webp"`);
     expect(log).toContain(`href="../contestant-visible/announcements/${id8(ids.image(11))}-menu.webp"`);
+    expect(text(entries, `${aurora}/log.html`)).toContain(`href="images/issue-0001/${id8(ids.image(1))}-loose%20cable.png"`);
   });
 
   it("shows each time in the event zone and in ISO", () => {
@@ -227,20 +361,29 @@ describe("HTML safety", () => {
   record.contest.name = "<img src=x onerror=alert(1)>";
   record.announcements[0]!.details = "</style><script>alert('x')</script>";
   record.issue_images[0]!.original_name = '"><script>alert(2)</script>.png';
-  const html = archiveEntries(record).flatMap((entry) => (entry.kind === "text" && entry.path.endsWith(".html") ? [entry.text] : []));
+  record.teams[1]!.name = "<b onmouseover=alert(3)>Cedar</b>";
+  const pages = new Map(
+    archiveEntries(record).flatMap((entry) => (entry.kind === "text" && entry.path.endsWith(".html") ? [[entry.path, entry.text] as const] : [])),
+  );
 
   it("escapes every value and holds no script", () => {
-    expect(html).toHaveLength(2);
-    for (const page of html) {
+    expect([...pages.keys()]).toHaveLength(3);
+    for (const page of pages.values()) {
       expect(page).not.toMatch(/<script/iu);
       expect(page).not.toContain("<img");
-      expect(page).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
-      expect(page).toContain("&quot;flaky&quot;");
+      expect(page).not.toContain("<b ");
       expect(page).toContain("&lt;img src=x onerror=alert(1)&gt;");
       expect(page).toContain("&lt;/style&gt;&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;");
       expect(page).not.toContain('"><script');
       expect(page).toContain(`content="default-src 'none'; style-src 'unsafe-inline'"`);
     }
+    // Issue 1 belongs to Aurora, so its description is in the staff log and the Aurora log only.
+    for (const path of ["staff-only/log.html", `${aurora}/log.html`]) {
+      expect(pages.get(path)).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+      expect(pages.get(path)).toContain("&quot;flaky&quot;");
+    }
+    expect(pages.get(`${aurora}/log.html`)).toContain("&quot;&gt;&lt;script&gt;alert(2)&lt;/script&gt;.png");
+    expect(pages.get("staff-only/log.html")).toContain("&lt;b onmouseover=alert(3)&gt;Cedar&lt;/b&gt;");
   });
 });
 
@@ -293,7 +436,12 @@ describe("README and manifest", () => {
     expect(readme).toContain("minsky-contest-archive, version 1");
     expect(readme).toContain("Do not give it to contestants.");
     expect(readme).toContain("staff-only/log.html");
-    expect(readme).toContain("contestant-visible/log.html");
+    expect(readme).toContain("contestant-visible/teams/<team folder>/log.html");
+    expect(readme).not.toContain("contestant-visible/log.html");
+    expect(readme).toContain("To give a team its record, copy the contestant-visible folder.");
+    expect(readme).toMatch(/Team folders\n/u);
+    expect(readme).toContain(`${aurora}/\n    Aurora, Hall A, desk 12`);
+    expect(readme).toContain(`${cedar}/\n    Cedar, Hall B, desk 4`);
     expect(readme).toContain("2026-11-03 23:00 Asia/Singapore (2026-11-03T15:00:00.000Z)");
     expect(readme).toContain(`staff-only/images/issue-0001/x.png (image ${ids.image(2)}): This image could not be opened.`);
     expect(readmeEntry(record, []).text).toMatch(/Files that this archive lacks\nNone\./u);
@@ -312,8 +460,8 @@ describe("README and manifest", () => {
       event: { code: "fixture-olympiad", time_zone: "Asia/Singapore" },
       contest: { id: ids.contest, name: "Spring finals" },
       counts: {
-        teams: 2, members: 2, issues: 3, history: 10, resolutions: 1, awards: 2, contest_awards: 3,
-        announcements: 2, issue_images: 3, announcement_images: 2, audit: 2,
+        teams: 2, members: 2, issues: 3, history: 11, resolutions: 1, awards: 2, contest_awards: 3,
+        announcements: 2, issue_images: 4, announcement_images: 2, audit: 2,
       },
       files: written,
       missing,

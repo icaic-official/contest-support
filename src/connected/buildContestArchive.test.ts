@@ -47,13 +47,44 @@ describe("buildContestArchive", () => {
       expect(sha256Hex(bytes ?? new Uint8Array()), file.path).toBe(file.sha256);
     }
     expect(manifest.missing).toEqual([]);
-    expect(manifest.counts).toMatchObject({ issues: 3, issue_images: 3, announcement_images: 2 });
+    expect(manifest.counts).toMatchObject({ issues: 3, issue_images: 4, announcement_images: 2 });
     expect(readText(files, "README.txt")).toMatch(/Files that this archive lacks\nNone\./u);
     expect(readText(files, "staff-only/record.json")).toContain("SENTINEL-INTERNAL-NOTE");
 
-    expect(progress[0]).toEqual({ stage: "images", done: 0, total: 4 });
-    expect(progress.filter((item) => item.stage === "images").map((item) => item.done)).toEqual([0, 1, 2, 3, 4]);
-    expect(progress.at(-1)).toEqual({ stage: "finishing", done: 4, total: 4 });
+    expect(progress[0]).toEqual({ stage: "images", done: 0, total: 5 });
+    expect(progress.filter((item) => item.stage === "images").map((item) => item.done)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(progress.at(-1)).toEqual({ stage: "finishing", done: 5, total: 5 });
+  });
+
+  it("gives each team a folder that holds its own files, and links only to those and the shared announcements", async () => {
+    const files = await unzip((await buildContestArchive(record, serve, () => undefined)).blob);
+    const paths = Object.keys(files).map((path) => path.slice(root.length + 1));
+    const teamLogs = paths.filter((path) => path.startsWith("contestant-visible/teams/") && path.endsWith("/log.html"));
+    expect(teamLogs).toHaveLength(2);
+    expect(paths.filter((path) => path.startsWith("contestant-visible/") && path.endsWith("log.html"))).toEqual(teamLogs);
+
+    for (const logPath of teamLogs) {
+      const folder = logPath.slice(0, -"/log.html".length);
+      const links = [...readText(files, logPath).matchAll(/href="([^"]*)"/gu)].map((match) => match[1] ?? "");
+      expect(links.length, logPath).toBeGreaterThan(0);
+      for (const link of links) {
+        const target = decodeURIComponent(new URL(link, `file:///${root}/${logPath}`).pathname.slice(1));
+        expect(files[target], `${logPath} links to ${target}`).toBeDefined();
+        const inside = target.startsWith(`${root}/${folder}/`) || target.startsWith(`${root}/contestant-visible/announcements/`);
+        expect(inside, `${logPath} links to ${target}`).toBe(true);
+      }
+      // Every file of the folder is something that the log links to or is the log itself.
+      const own = paths.filter((path) => path.startsWith(`${folder}/`));
+      expect(own.length).toBe(links.filter((link) => !link.startsWith("../../announcements/")).length + 1);
+    }
+
+    // Two images of the Aurora folder and the Cedar folder differ, and the zip holds each once.
+    const cedarImage = paths.find((path) => path.includes(`${ids.image(4).slice(0, 8)}-projector.png`));
+    expect(cedarImage).toMatch(/^contestant-visible\/teams\/cedar-/u);
+    expect(files[`${root}/${cedarImage}`]).toEqual(imageBytes(ids.image(4)));
+    for (const [logPath, other] of [[teamLogs[0], "projector"], [teamLogs[1], "loose cable"]] as const) {
+      expect(readText(files, logPath ?? ""), logPath).not.toContain(other);
+    }
   });
 
   it("keeps an image whose digest does not match out of the zip and lists it as missing", async () => {
@@ -83,7 +114,7 @@ describe("buildContestArchive", () => {
     expect(built.missing.every((file) => file.reason === "This announcement image could not be opened.")).toBe(true);
     const files = await unzip(built.blob);
     expect(Object.keys(files).filter((path) => path.includes("/announcements/"))).toEqual([]);
-    expect(Object.keys(files).filter((path) => path.includes("/images/"))).toHaveLength(2);
+    expect(Object.keys(files).filter((path) => path.includes("/images/"))).toHaveLength(3);
   });
 
   it("accepts an image whose record has no digest, and a digest in capitals", async () => {
@@ -137,9 +168,10 @@ describe("buildContestArchive", () => {
     const crowded = fixtureRecord();
     const [issue, image] = [crowded.issues[0]!, crowded.issue_images[0]!];
     const id = (prefix: string, index: number) => `${prefix}${index.toString(16).padStart(7, "0")}-0000-4000-8000-000000000000`;
-    // At most 24 images per issue, as the contest limits allow.
+    // At most 24 images per issue, as the contest limits allow. The archive holds 4 staff files, one log for
+    // each of the 2 teams, the README, and the manifest, so 65,528 images make 65,536 files, one too many.
     crowded.issues = Array.from({ length: 2_731 }, (_, index) => ({ ...issue, id: id("a", index), number: index + 1 }));
-    crowded.issue_images = Array.from({ length: 65_535 }, (_, index) => ({
+    crowded.issue_images = Array.from({ length: 65_528 }, (_, index) => ({
       ...image, id: id("b", index), issue_id: id("a", index % 2_731), byte_size: 1,
     }));
     await expect(buildContestArchive(crowded, serve, () => undefined)).rejects.toThrow("more than 65,000 files");

@@ -6,6 +6,9 @@ import { type ContestRecord, contestRecordSchema } from "./contestRecord.ts";
 /** Text that only staff may read. No contestant-visible archive file may hold it. */
 export const INTERNAL_NOTE = "SENTINEL-INTERNAL-NOTE do not tell the team about the cable stock";
 
+/** A public reply on a Cedar issue. No other team's archive file may hold it. */
+export const CEDAR_REPLY = "CEDAR-ONLY-REPLY the projector lamp is on order";
+
 /** The number is the first group, so that the first 8 characters of each ID differ. */
 const uuid = (n: number) => `${String(n).padStart(8, "0")}-0000-4000-8000-000000000000`;
 export const ids = {
@@ -46,8 +49,9 @@ const award = {
 
 /**
  * Two teams and three issues. Issue 1 holds a team-visible image, a staff-only
- * image, an internal note, an applied award, and a removed image. Issue 7 holds
- * a withdrawn award. The announcements include one that an admin removed.
+ * image, an internal note, an applied award, and a removed image. Issue 7 belongs
+ * to the other team and holds a withdrawn award, a public reply, and a team-visible
+ * image. The announcements include one that an admin removed.
  */
 export function fixtureRecord(): ContestRecord {
   return contestRecordSchema.parse({
@@ -104,6 +108,7 @@ export function fixtureRecord(): ContestRecord {
       { id: uuid(406), issue_id: ids.issue(1), at: t(41), actor: ids.staff, actor_name: "Jordan Jury", text: "5 minutes awarded: Lost time while waiting", visibility: "public" },
       { id: uuid(407), issue_id: ids.issue(1), at: t(45), actor: ids.staff, actor_name: "Jordan Jury", text: "External application confirmed.", visibility: "public" },
       { id: uuid(408), issue_id: ids.issue(7), at: t(50), actor: ids.staff, actor_name: "Jordan Jury", text: "Issue submitted: =HYPERLINK(\"http://example.invalid\")", visibility: "public" },
+      { id: uuid(411), issue_id: ids.issue(7), at: t(52), actor: ids.staff, actor_name: "Jordan Jury", text: CEDAR_REPLY, visibility: "public" },
       { id: uuid(409), issue_id: ids.issue(7), at: t(55), actor: ids.staff, actor_name: "Jordan Jury", text: "1 minutes awarded: Test award", visibility: "public" },
       { id: uuid(410), issue_id: ids.issue(7), at: t(56), actor: ids.staff, actor_name: "Jordan Jury", text: "Time award withdrawn. It gives no time.", visibility: "public" },
     ],
@@ -155,6 +160,12 @@ export function fixtureRecord(): ContestRecord {
         id: ids.image(3), issue_id: ids.issue(1), uploader: ids.staff, uploader_name: "Jordan Jury", visibility: "internal", state: "deleted",
         byte_size: null, content_type: "image/png", original_name: "removed.png", original_path: null, original_digest: null,
         created_at: t(17), uploaded_at: t(17), deleted_by: ids.staff, deleted_at: t(18),
+      },
+      {
+        id: ids.image(4), issue_id: ids.issue(7), uploader: ids.staff, uploader_name: "Jordan Jury", visibility: "public", state: "ready",
+        byte_size: imageBytes(ids.image(4)).byteLength, content_type: "image/png", original_name: "projector.png",
+        original_path: `${ids.contest}/${ids.issue(7)}/${ids.image(4)}/original`, original_digest: digestOf(ids.image(4)),
+        created_at: t(53), uploaded_at: t(53), deleted_by: null, deleted_at: null,
       },
     ],
     announcement_images: [

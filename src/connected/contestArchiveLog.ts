@@ -52,7 +52,7 @@ const audienceText: Record<Audience, { title: string; warning: string }> = {
   contestant: {
     title: "Contestant-visible log",
     warning:
-      "This log holds only what contestants could see. It covers every team. Do not give one team the issues of another team.",
+      "This log holds only what this team could see. It has the issues of this team, and the announcements and contest-wide awards that every team could see. Give it to this team only.",
   },
 };
 
@@ -134,10 +134,12 @@ function groupBy<T>(items: readonly T[], key: (item: T) => string): Map<string, 
 
 const byTime = (a: { at: string }, b: { at: string }) => Date.parse(a.at) - Date.parse(b.at);
 
-/** Renders the record for one audience. Pass `contestantView(record)` for the contestant log. */
+/** Renders the record for one audience. Pass `teamView(record, teamId)` for the log of one team. */
 export function renderLog(record: ContestRecord, audience: Audience, links: ImageLinks, from: string): string {
   const zone = record.event.time_zone;
   const staff = audience === "staff";
+  // The view of one team holds only that team.
+  const [viewTeam] = staff ? [] : record.teams;
   const stamp = (instant: string) => stampText(instant, zone);
   const named = (name: string | null) => name ?? "Unknown";
 
@@ -246,7 +248,7 @@ export function renderLog(record: ContestRecord, audience: Audience, links: Imag
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
 <meta name="robots" content="noindex">
-<title>${audienceText[audience].title}: ${contest.name}</title>
+<title>${audienceText[audience].title}: ${contest.name}${viewTeam && ` (${viewTeam.name})`}</title>
 <style>${new Markup(styles)}</style>
 </head><body>
 <header>
@@ -254,6 +256,7 @@ export function renderLog(record: ContestRecord, audience: Audience, links: Imag
 <p>${audienceText[audience].title} of ${record.event.name}${record.event.code && ` (${record.event.code})`}.</p>
 <p class="banner">${audienceText[audience].warning}</p>
 <dl>
+  ${viewTeam && html`<dt>Team</dt><dd>${viewTeam.name} (${viewTeam.location})</dd>`}
   <dt>Exported</dt><dd>${stamp(record.exported_at)}${staff && ` by ${record.exported_by.name}`}</dd>
   <dt>Time zone</dt><dd>${zone}</dd>
   <dt>Kind</dt><dd>${contest.kind === "live" ? "Live" : "Practice"}, ${contest.contest_type}</dd>

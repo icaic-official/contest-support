@@ -174,6 +174,8 @@ describe("buildContestArchive", () => {
     crowded.issue_images = Array.from({ length: 65_528 }, (_, index) => ({
       ...image, id: id("b", index), issue_id: id("a", index % 2_731), byte_size: 1,
     }));
+    crowded.announcement_images = [];
+    expect(archiveEntries(crowded).length + 2).toBe(65_536);
     await expect(buildContestArchive(crowded, serve, () => undefined)).rejects.toThrow("more than 65,000 files");
   });
 });

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ContestArchiveButton } from "@/connected/ContestArchiveButton";
 import { intakeHeadline } from "@/connected/intakeText";
 import { rosterTextMax, teamsPerCommandMax } from "@/connected/roster";
 import { viewerNote } from "@/connected/zonedTime";
@@ -170,7 +171,7 @@ export function ContestsTab({ data, state }: TabProps) {
                     )}
                   </p>
                 </div>
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                   <Badge variant="outline">{intakeHeadline(contest.intake.reason)}</Badge>
                   <Button
                     type="button"
@@ -186,6 +187,8 @@ export function ContestsTab({ data, state }: TabProps) {
                   >
                     <Pencil aria-hidden="true" />
                   </Button>
+                  {/* Reading is allowed in an archived event, so this stays on when `locked`. */}
+                  <ContestArchiveButton contestId={contest.id} contestName={contest.name} />
                 </div>
                 {contest.waiting.length > 0 && (
                   <LivePasswords

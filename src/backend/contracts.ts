@@ -3,6 +3,7 @@ import type {
   AnnouncementImage,
   AnnouncementSnapshot,
 } from '../connected/announcementModel.ts';
+import type { ContestRecord } from '../connected/contestRecord.ts';
 import type { Command, Role, Snapshot } from '../connected/model.ts';
 
 /**
@@ -404,6 +405,12 @@ export interface Management {
    * the console of the caller's own event.
    */
   event(eventId?: string): Promise<EventConsole>;
+  /**
+   * The complete support record of one contest, for its archive. Requires the
+   * `export_contest` capability in that contest. A webmaster that has not
+   * joined a contest that the site restricts is refused.
+   */
+  contestRecord(sessionId: string): Promise<ContestRecord>;
   /**
    * Reusing a request ID with the same command returns the first receipt.
    * A rejection carries the reason. Other failures leave the outcome unknown,

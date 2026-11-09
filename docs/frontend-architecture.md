@@ -419,7 +419,7 @@ The browser builds the zip. The Worker has a CPU limit of 1,000 ms, and a zip co
 3. The builder writes the zip with fflate. Text files use `ZipDeflate` and images use `ZipPassThrough`, because they are compressed already. Output chunks stay in a list of Blob parts, and one Blob is built at the end. fflate writes no ZIP64, so a contest with more than 4 GB of images gets an error and no file.
 4. `ContestArchiveButton` saves the Blob with an object URL and a link with `download`. The URL is revoked after 60 seconds.
 
-The builder, fflate and the record schema load on the first click. No screen carries them. `npm run perf:size` lists them as lazy chunks.
+The builder and fflate load on the first click. No screen carries them. `npm run perf:size` lists them as lazy chunks. The record schema stays in the backend chunk.
 
 | File | Content |
 | --- | --- |

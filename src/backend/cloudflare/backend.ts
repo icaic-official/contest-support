@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Announcements, Avatars, Backend, LiveUpdates } from '../contracts';
 import { AnnouncementRejectedError, ImageRequestError, RequestRefusedError, WorkflowRejectedError, workflowRejectionMessage } from '../errors';
 import { announcementSnapshotSchema } from '../../connected/announcementModel';
+import { contestRecordSchema } from '../../connected/contestRecord';
 import { AVATAR_MAX_BYTES, imageKind } from '../../connected/imageFile';
 import { type Command, roleSchema, snapshotSchema, type Snapshot } from '../../connected/model';
 import { createCloudflareAuthentication } from './authentication';
@@ -321,10 +322,7 @@ export function createCloudflareBackend(options: {
         return consoleSchema.parse(await readJson(await send(eventId === undefined ? '/api/event' : `/api/event?eventId=${encodeURIComponent(eventId)}`)));
       },
       async contestRecord(sessionId) {
-        const body = await readJson(await send(`/api/contest-record?sessionId=${encodeURIComponent(sessionId)}`));
-        // Only an export needs the record schema, so it loads with the first export and not with the app.
-        const { contestRecordSchema } = await import('../../connected/contestRecord');
-        return contestRecordSchema.parse(body);
+        return contestRecordSchema.parse(await readJson(await send(`/api/contest-record?sessionId=${encodeURIComponent(sessionId)}`)));
       },
       async execute(requestId, command) {
         return receiptSchema.parse(await readJson(await post('/api/manage', { requestId, command })));

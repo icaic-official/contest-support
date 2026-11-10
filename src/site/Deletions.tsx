@@ -51,7 +51,8 @@ export function Deletions({ deletions }: { deletions: readonly EventDeletion[] }
               <Badge variant={deletion.blockedBy ? "destructive" : "secondary"}>{label}</Badge>
             </div>
             <p className="text-xs break-words text-muted-foreground">
-              <span className="font-mono">{deletion.eventCode}</span> · Requested by {deletion.requestedByName}, {when(deletion.requestedAt)}.
+              <span className="mr-2 rounded bg-muted px-1.5 py-0.5 font-mono text-foreground/80">{deletion.eventCode}</span>{" "}
+              Requested by {deletion.requestedByName}, {when(deletion.requestedAt)}.
             </p>
             {detail && <p className="text-sm break-words text-muted-foreground">{detail}</p>}
           </li>

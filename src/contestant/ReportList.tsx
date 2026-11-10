@@ -3,6 +3,7 @@ import { type Issue, type Resolution, unresolvedTime } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "./StatusBadge";
+import { Meta } from "@/components/meta";
 
 /** The team's reports in the left column, newest first. */
 export function ReportList({
@@ -57,8 +58,11 @@ export function ReportList({
                   {issue.description}
                 </span>
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  ISS-{issue.number} · {issue.category} ·{" "}
-                  {relativeAge(issue.created_at, now)}
+                  <Meta>
+                    <span className="font-mono">ISS-{issue.number}</span>
+                    <span>{issue.category}</span>
+                    <span className="tabular-nums">{relativeAge(issue.created_at, now)}</span>
+                  </Meta>
                 </span>
               </button>
             </li>

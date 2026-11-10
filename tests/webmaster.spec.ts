@@ -73,7 +73,7 @@ test('a webmaster turns the restriction on, joins a contest, and sees the join i
     await page.getByRole('complementary', { name: 'Console' }).getByRole('link', { name: 'Site', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Site', level: 1 })).toBeVisible();
     await expect(page.getByText(/^\d{2}:\d{2}$/)).toBeVisible();
-    await expect(page.getByText(Intl.DateTimeFormat().resolvedOptions().timeZone, { exact: true })).toBeVisible();
+    await expect(page.locator("header").getByText(Intl.DateTimeFormat().resolvedOptions().timeZone, { exact: true })).toBeVisible();
 
     const restriction = page.getByRole('switch', { name: 'Webmasters read contest data only after joining' });
     await expect(restriction).not.toBeChecked();

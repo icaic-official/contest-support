@@ -247,7 +247,10 @@ export function Announcements({ data }: { data: SessionData }) {
           <h2 id={headingId} className="min-w-0 flex-1 truncate text-sm font-medium">
             Announcements
             {hidden && (
-              <span className="font-normal text-muted-foreground"> · {latest.title}</span>
+              <>
+                {" "}
+                <span className="ml-1.5 font-normal text-muted-foreground">{latest.title}</span>
+              </>
             )}
           </h2>
           {canWrite && !hidden && (

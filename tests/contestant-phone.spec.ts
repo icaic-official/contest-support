@@ -271,7 +271,7 @@ for (const width of widths) {
     const list = page.getByRole("navigation", { name: "Reports" });
     await expect(list.getByRole("button", { name: /Keyboard stopped/ })).toBeVisible();
     await check(page, "list", "12-list", dir);
-    await list.getByRole("button", { name: /ISS-5 ·/ }).click();
+    await list.getByRole("button", { name: /ISS-5\s*,/ }).click();
     await expect(page.getByRole("region", { name: /award|Award/ }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "5 minutes" })).toBeVisible();
     await check(page, "award", "13-award", dir);

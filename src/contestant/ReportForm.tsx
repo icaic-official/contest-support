@@ -74,7 +74,7 @@ export function ReportForm({
   const category = categories.includes(draft.category)
     ? draft.category
     : (categories[0] ?? "");
-  const place = [teamName, location].filter(Boolean).join(" · ");
+  const place = [teamName, location].filter(Boolean).join(", ");
   return (
     <div className="mx-auto max-w-3xl p-4 lg:p-8">
       <h1

@@ -264,7 +264,7 @@ export function AccountsPage({
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <caption className="sr-only">
-            Accounts · {state.members.length}
+            Accounts
           </caption>
           <TableHeader>
             <TableRow className="text-xs hover:bg-transparent">

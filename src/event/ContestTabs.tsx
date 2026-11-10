@@ -30,6 +30,7 @@ import {
   scheduleOfDraft,
 } from "./scheduleForm";
 import type { EventConsoleState } from "./useEventConsole";
+import { Meta } from "@/components/meta";
 
 interface TabProps {
   data: EventConsole;
@@ -152,7 +153,7 @@ export function ContestsTab({ data, state }: TabProps) {
           </Button>
         </form>
       </Panel>
-      <Panel title={`Contests · ${data.contests.length}`}>
+      <Panel title="Contests">
         {data.contests.length === 0 ? (
           <p className="text-sm text-muted-foreground">No contests yet.</p>
         ) : (
@@ -162,13 +163,18 @@ export function ContestsTab({ data, state }: TabProps) {
                 <div className="min-w-0 flex-1 basis-36 leading-tight">
                   <p className="truncate text-sm font-medium">{contest.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {contest.kind === "live" ? "Live" : "Practice"} · {contestTypeLabels[contest.contestType]}
+                    <Meta>
+                      <span>{contest.kind === "live" ? "Live" : "Practice"}</span>
+                      <span>{contestTypeLabels[contest.contestType]}</span>
+                    </Meta>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {contest.schedule ? describeSchedule(contest.schedule, timeZone) : "No schedule"}
-                    {contest.schedule && viewerNote(contest.schedule.startsAt, timeZone, "datetime") && (
-                      <span> · {viewerNote(contest.schedule.startsAt, timeZone, "datetime")}</span>
-                    )}
+                    <Meta>
+                      <span>{contest.schedule ? describeSchedule(contest.schedule, timeZone) : "No schedule"}</span>
+                      {contest.schedule && viewerNote(contest.schedule.startsAt, timeZone, "datetime") && (
+                        <span>{viewerNote(contest.schedule.startsAt, timeZone, "datetime")}</span>
+                      )}
+                    </Meta>
                   </p>
                 </div>
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
@@ -417,7 +423,8 @@ function EntrantAssignments({
   };
   return (
     <Panel
-      title={`Entrants in ${contest.name} · ${seated.size}`}
+      title={`Entrants in ${contest.name}`}
+      count={seated.size}
       description={`This contest takes: ${contestTypeLabels[contest.contestType].toLowerCase()}. Assigning gives each entrant's sign-in a seat.`}
     >
       <div className="space-y-4">
@@ -545,7 +552,8 @@ function StaffAssignments({
   const admins = new Set(data.admins);
   return (
     <Panel
-      title={`Staff in ${contest.name} · ${held.size}`}
+      title={`Staff in ${contest.name}`}
+      count={held.size}
       description="Pick roles, or make a person a contest admin. Event admins reach every contest without a seat."
     >
       {data.people.length === 0 ? (

@@ -408,7 +408,7 @@ test('automatic session fallback drops the previous session’s phone report tea
   await expect(report).toBeHidden();
   fixture.revokeFirstSession();
   await refresh(page);
-  await expect(page.getByText('Review event · Session two')).toBeVisible();
+  await expect(page.getByText('Session two', { exact: true })).toBeVisible();
   await expect((await openReport(page)).locator('#report-team-search')).toHaveValue('');
   expect(fixture.errors).toEqual([]);
 });

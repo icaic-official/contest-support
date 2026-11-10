@@ -243,7 +243,7 @@ test("the demo replays the lifecycle and the timer stops on resolution", async (
   await page.clock.runFor(2400);
   await expect(escalated).toBeVisible();
   await expect(card.getByText("Swap the DisplayPort cable first.")).toBeVisible();
-  await expect(card.getByText("Internal note · staff only")).toBeVisible();
+  await expect(card.getByText("Internal note, staff only")).toBeVisible();
   await expect(resolved).toBeHidden();
 
   await page.clock.runFor(2400);

@@ -145,12 +145,12 @@ export function ContestAwardsPanel({
               {award.withdrawn_at ? (
                 <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Undo2 aria-hidden="true" className="size-3.5" />
-                  Withdrawn by {award.withdrawn_name} · gives no time
+                  Withdrawn by {award.withdrawn_name}, gives no time
                 </p>
               ) : award.applied_at ? (
                 <p className="mt-1.5 flex items-center gap-1.5 text-xs text-status-resolved">
                   <CheckCheck aria-hidden="true" className="size-3.5" />
-                  Applied · confirmed by {award.applied_name}
+                  Confirmed by {award.applied_name}
                 </p>
               ) : (
                 !archived && (

@@ -94,7 +94,8 @@ export function Calendar({
         events.map((event) => (
           <div key={event.eventId} className="space-y-2">
             <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {event.eventName} · {event.timeZone}
+              {event.eventName}{" "}
+              <span className="ml-2 font-normal tracking-normal normal-case opacity-80">{event.timeZone}</span>
             </h4>
             {event.days.map((day) => (
               <div key={day.date} className="rounded-lg border">

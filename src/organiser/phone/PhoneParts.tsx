@@ -66,9 +66,9 @@ export function PhoneHeader({
     <header className="shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         <ConnectionBadge connected={connected} />
-        <span aria-hidden="true">·</span>
-        <span className="truncate">
-          {state.event?.name ?? "Your contest"} · {state.session?.name}
+        <span className="min-w-0 truncate">
+          <span className="font-medium text-foreground/80">{state.event?.name ?? "Your contest"}</span>
+          {state.session?.name && <>{" "}<span className="ml-1.5">{state.session.name}</span></>}
         </span>
       </div>
       <div className="mt-1 flex items-center gap-3">

@@ -34,6 +34,7 @@ import {
   wasReopened,
 } from "./contestantView";
 import { StatusBadge } from "./StatusBadge";
+import { Meta } from "@/components/meta";
 
 /** A wall-clock time such as 14:17. */
 function wallTime(value: string): string {
@@ -161,11 +162,9 @@ export function IssuePage({
   return (
     <article className="mx-auto max-w-4xl space-y-4 p-4 lg:space-y-6 lg:p-8">
       <header>
-        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span className="font-mono">ISS-{issue.number}</span>
-          <span aria-hidden="true">·</span>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground/80">ISS-{issue.number}</span>
           <span>{issue.category}</span>
-          <span aria-hidden="true">·</span>
           <span>
             sent{" "}
             <time dateTime={issue.created_at} title={formatDate(issue.created_at)}>
@@ -238,10 +237,12 @@ export function IssuePage({
           </h2>
           <p className="mt-1 text-lg font-medium break-words">{current.summary}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {current.actor_name} ·{" "}
-            <time dateTime={current.at} title={formatDate(current.at)}>
-              {wallTime(current.at)}
-            </time>
+            <Meta>
+              <span>{current.actor_name}</span>
+              <time dateTime={current.at} title={formatDate(current.at)} className="tabular-nums">
+                {wallTime(current.at)}
+              </time>
+            </Meta>
           </p>
           {!archived &&
             (reopenOpen ? (
@@ -324,12 +325,18 @@ export function IssuePage({
               <li key={item.id} className="border-l-2 pl-3 text-sm">
                 <p className="break-words">{item.summary}</p>
                 <p className="text-xs text-muted-foreground">
-                  Resolved by {item.actor_name} · {formatDate(item.at)}
+                  <Meta>
+                    <span>Resolved by {item.actor_name}</span>
+                    <span className="tabular-nums">{formatDate(item.at)}</span>
+                  </Meta>
                 </p>
                 {item.reopened_at && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Reopened by {item.reopened_by === userId ? "you" : item.reopened_name}{" "}
-                    · {formatDate(item.reopened_at)}: {item.reason}
+                    <Meta>
+                      <span>Reopened by {item.reopened_by === userId ? "you" : item.reopened_name}</span>
+                      <span className="tabular-nums">{formatDate(item.reopened_at)}</span>
+                    </Meta>
+                    <span className="mt-0.5 block text-foreground/80">{item.reason}</span>
                   </p>
                 )}
               </li>
@@ -372,10 +379,12 @@ export function IssuePage({
             <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
               <li className="flex items-center gap-1.5 text-status-resolved">
                 <CircleCheck className="size-3.5" aria-hidden="true" />
-                Decided by the jury ·{" "}
-                <time dateTime={award.at} title={formatDate(award.at)}>
-                  {wallTime(award.at)}
-                </time>
+                <Meta>
+                  <span>Decided by the jury</span>
+                  <time dateTime={award.at} title={formatDate(award.at)} className="tabular-nums opacity-80">
+                    {wallTime(award.at)}
+                  </time>
+                </Meta>
               </li>
               <li
                 className={cn(
@@ -390,13 +399,16 @@ export function IssuePage({
                 )}
                 {award.applied_at ? (
                   <>
-                    Applied to your contest time ·{" "}
-                    <time
-                      dateTime={award.applied_at}
-                      title={formatDate(award.applied_at)}
-                    >
-                      {wallTime(award.applied_at)}
-                    </time>
+                    <Meta>
+                      <span>Applied to your contest time</span>
+                      <time
+                        dateTime={award.applied_at}
+                        title={formatDate(award.applied_at)}
+                        className="tabular-nums opacity-80"
+                      >
+                        {wallTime(award.applied_at)}
+                      </time>
+                    </Meta>
                   </>
                 ) : (
                   "Not yet applied to your contest time"
@@ -425,10 +437,12 @@ export function IssuePage({
               >
                 <span aria-hidden="true" className="h-px flex-1 bg-border" />
                 <span className="max-w-[85%] text-center break-words lg:max-w-[70%]">
-                  {item.text} ·{" "}
-                  <time dateTime={item.entry.at} title={formatDate(item.entry.at)}>
-                    {wallTime(item.entry.at)}
-                  </time>
+                  <Meta>
+                    <span>{item.text}</span>
+                    <time dateTime={item.entry.at} title={formatDate(item.entry.at)} className="tabular-nums opacity-70">
+                      {wallTime(item.entry.at)}
+                    </time>
+                  </Meta>
                 </span>
                 <span aria-hidden="true" className="h-px flex-1 bg-border" />
               </li>
@@ -436,10 +450,12 @@ export function IssuePage({
               <li key={item.entry.id} className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-br-md lg:max-w-[70%] bg-primary px-4 py-2.5 text-primary-foreground">
                   <p className="text-xs opacity-70">
-                    You ·{" "}
-                    <time dateTime={item.entry.at} title={formatDate(item.entry.at)}>
-                      {wallTime(item.entry.at)}
-                    </time>
+                    <Meta>
+                      <span className="font-medium">You</span>
+                      <time dateTime={item.entry.at} title={formatDate(item.entry.at)} className="tabular-nums">
+                        {wallTime(item.entry.at)}
+                      </time>
+                    </Meta>
                   </p>
                   <p className="text-sm break-words whitespace-pre-wrap">
                     {item.entry.text}
@@ -456,10 +472,12 @@ export function IssuePage({
                 </span>
                 <div className="max-w-[85%] min-w-0 rounded-2xl rounded-bl-md lg:max-w-[70%] border px-4 py-2.5">
                   <p className="text-xs text-muted-foreground">
-                    {item.entry.actor_name} ·{" "}
-                    <time dateTime={item.entry.at} title={formatDate(item.entry.at)}>
-                      {wallTime(item.entry.at)}
-                    </time>
+                    <Meta>
+                      <span className="font-medium text-foreground">{item.entry.actor_name}</span>
+                      <time dateTime={item.entry.at} title={formatDate(item.entry.at)} className="tabular-nums">
+                        {wallTime(item.entry.at)}
+                      </time>
+                    </Meta>
                   </p>
                   <p className="text-sm break-words whitespace-pre-wrap">
                     {item.entry.text}

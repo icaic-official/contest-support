@@ -18,6 +18,7 @@ import { clockDuration } from "@/connected/ui";
 import { StatusBadge } from "@/contestant/StatusBadge";
 import { documentationUrl } from "@/lib/links";
 import { cn } from "@/lib/utils";
+import { Meta } from "@/components/meta";
 
 const replyText = "On our way to table C7.";
 const noteText = "Swap the DisplayPort cable first.";
@@ -205,7 +206,10 @@ function DemoCard({ position }: { position: Position }) {
         </div>
         <p className="mt-3 font-medium">Monitor goes black every few minutes</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Team Blue Herons · Table C7
+          <Meta>
+            <span>Team Blue Herons</span>
+            <span>Table C7</span>
+          </Meta>
         </p>
       </div>
       <div
@@ -290,7 +294,10 @@ function InternalNote({ children }: { children: ReactNode }) {
     <div className="internal-surface rounded-lg border p-3 text-sm">
       <p className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
         <Lock aria-hidden="true" className="size-3" />
-        Internal note · staff only
+        <Meta>
+          <span>Internal note</span>
+          <span className="font-normal opacity-80">staff only</span>
+        </Meta>
       </p>
       <p className="mt-1">{children}</p>
     </div>

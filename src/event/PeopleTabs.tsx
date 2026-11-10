@@ -68,7 +68,7 @@ export function PeopleTab({ data, state }: TabProps) {
           }}
         />
       </Panel>
-      <Panel title={`People · ${data.people.length}`}>
+      <Panel title="People">
         {data.people.length === 0 ? (
           <p className="text-sm text-muted-foreground">No staff accounts yet.</p>
         ) : (
@@ -269,11 +269,11 @@ export function EntrantsTab({ data, state }: TabProps) {
           </fieldset>
         </LinesForm>
       </Panel>
-      <Panel title={`Entrants · ${data.entrants.length}`}>
+      <Panel title="Entrants">
         {data.entrants.length === 0 ? (
           <p className="text-sm text-muted-foreground">No entrants yet.</p>
         ) : (
-          <ul className="divide-y">
+          <ul aria-label="All entrants" className="divide-y">
             {data.entrants.map((entrant) => (
               <li key={entrant.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <div className="min-w-0 flex-1 basis-36 leading-tight">

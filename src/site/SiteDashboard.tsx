@@ -110,7 +110,7 @@ export function SiteDashboard({
             <div className="space-y-5">
               <Events site={site} state={state} />
               {site.deletions.length > 0 && (
-                <SiteCard title={`Deletions · ${site.deletions.length}`} headingId={deletionsHeadingId}>
+                <SiteCard title="Deletions" headingId={deletionsHeadingId}>
                   <Deletions deletions={site.deletions} />
                 </SiteCard>
               )}
@@ -515,7 +515,7 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
   const openedId = useRef<string | undefined>(undefined);
   return (
     <SiteCard
-      title={`Events · ${site.events.length}`}
+      title="Events"
       action={
         <Button type="button" variant="outline" className="h-11" onClick={() => {
           state.clearError();
@@ -537,9 +537,10 @@ function Events({ site, state }: { site: SiteOverview; state: SiteState }) {
                   {item.name || "Unnamed event"}
                   {item.archived && <span className="ml-1 text-xs font-normal text-muted-foreground">(archived)</span>}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  <span className="font-mono">{item.code}</span> · {item.contests} {item.contests === 1 ? "contest" : "contests"} ·{" "}
-                  {item.accounts} {item.accounts === 1 ? "account" : "accounts"}
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono break-all text-foreground/80">{item.code}</span>
+                  <span>{item.contests} {item.contests === 1 ? "contest" : "contests"}</span>
+                  <span>{item.accounts} {item.accounts === 1 ? "account" : "accounts"}</span>
                 </p>
               </div>
               <div className="ml-auto flex flex-wrap gap-2">

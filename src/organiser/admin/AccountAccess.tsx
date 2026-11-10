@@ -24,6 +24,7 @@ import {
   auditEntryText,
 } from "./adminModel";
 import type { SessionAdmin } from "./useSessionAdmin";
+import { Meta } from "@/components/meta";
 
 /** The error (role=alert) and the notice (role=status) of admin requests. */
 export function AdminFeedback({
@@ -274,7 +275,10 @@ export function AdminActivity({ state }: { state: Snapshot }) {
             {auditEntryText(state.members, entry)}
           </span>
           <span className="block text-xs text-muted-foreground">
-            {actorName(state.members, entry)} · {formatDate(entry.at)}
+            <Meta>
+              <span>{actorName(state.members, entry)}</span>
+              <span className="tabular-nums">{formatDate(entry.at)}</span>
+            </Meta>
           </span>
         </li>
       ))}

@@ -109,7 +109,7 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
             id="session-accounts"
             className="flex-1 text-xs font-medium text-muted-foreground"
           >
-            Accounts · {state.members.length}
+            Accounts
           </h2>
         </div>
         <AccountList
@@ -126,7 +126,7 @@ export function SessionTab({ state, shell }: PhoneTabProps) {
           Open an account to change its username or reset its password.
         </p>
       </section>
-      <Collapsible title={`Team locations · ${state.teams.length}`}>
+      <Collapsible title="Team locations">
         <TeamLocationEditor state={state} admin={admin} />
       </Collapsible>
       <Collapsible title="Categories">

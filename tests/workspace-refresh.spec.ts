@@ -110,7 +110,7 @@ async function openReply(page: Page, issueOpen = false): Promise<Composer> {
  * issue view from assistive technology, so check it after the sheet closes.
  */
 function activityHeading(page: Page): Locator {
-  return page.getByRole('heading', { name: /^Activity · / });
+  return page.getByRole('heading', { name: /^Activity/ });
 }
 
 /**
@@ -336,14 +336,14 @@ for (const [layout, viewport] of viewports) {
         if (!isDesktop(page)) {
           // A recorded reply closes the phone sheet. Open it again.
           await expect(form.scope).toBeHidden();
-          await expect(activityHeading(page)).toHaveText('Activity · 1 entry');
+          await expect(activityHeading(page)).toHaveText('Activity 1 entry');
           form = await openReply(page, true);
         }
         await expect(form.message).toHaveValue('');
         await expect(form.audience('public')).toBeChecked();
         await expect(form.send).toBeDisabled();
         if (isDesktop(page)) {
-          await expect(activityHeading(page)).toHaveText('Activity · 1 entry');
+          await expect(activityHeading(page)).toHaveText('Activity 1 entry');
         }
         expect(requests).toEqual([requests[0], requests[0], requests[0]]);
         expect(requests[0]).toEqual({
@@ -366,7 +366,7 @@ for (const [layout, viewport] of viewports) {
         } else {
           await expect(form.scope).toBeHidden();
         }
-        await expect(activityHeading(page)).toHaveText('Activity · 2 entries');
+        await expect(activityHeading(page)).toHaveText('Activity 2 entries');
         expect(requests).toHaveLength(4);
         expect(requests[3]!.requestId).not.toBe(requests[0]!.requestId);
         expect(state.history.map((item) => item.text)).toEqual([
@@ -392,10 +392,10 @@ for (const [layout, viewport] of viewports) {
       await expect(form.send).toBeEnabled();
       await expect(form.retry).toHaveCount(0);
       if (isDesktop(page)) {
-        await expect(activityHeading(page)).toHaveText('Activity · 0 entries');
+        await expect(activityHeading(page)).toHaveText('Activity 0 entries');
       } else {
         await form.scope.getByRole('button', { name: 'Cancel', exact: true }).click();
-        await expect(activityHeading(page)).toHaveText('Activity · 0 entries');
+        await expect(activityHeading(page)).toHaveText('Activity 0 entries');
       }
     });
 

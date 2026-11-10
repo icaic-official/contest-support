@@ -154,7 +154,7 @@ test.describe("contest-wide time awards", () => {
     // The jury sees the confirmation and cannot confirm twice.
     await jury.reload();
     await jury.getByRole("navigation", { name: "Console pages" }).getByRole("button", { name: /^Award review/ }).click();
-    await expect(jury.getByRole("region", { name: "Time awards for the whole contest" })).toContainText("Applied · confirmed by Test volunteer");
+    await expect(jury.getByRole("region", { name: "Time awards for the whole contest" })).toContainText("Confirmed by Test volunteer");
   });
 
   test("a retry after a lost response and a failed refresh records one award", async ({ browser, local }) => {
@@ -269,7 +269,7 @@ test.describe("contest-wide time awards", () => {
 
     await panel.getByRole("button", { name: "Withdraw the 15 minutes award" }).click();
     await dialog.getByRole("button", { name: "Withdraw award", exact: true }).click();
-    await expect(panel).toContainText("Withdrawn by Test jury · gives no time");
+    await expect(panel).toContainText("Withdrawn by Test jury, gives no time");
     await expect(panel.getByRole("button", { name: /^Withdraw the/ })).toHaveCount(0);
     expect(await local.rows("SELECT id FROM contest_awards WHERE session_id = ?", local.sessions[0])).toHaveLength(1);
 
@@ -409,7 +409,7 @@ test.describe("keyboard focus on the organiser console", () => {
     await expect(async () => {
       await panel.getByRole("button", { name: "Confirm applied externally" }).focus({ timeout: 1000 });
       await jury.keyboard.press("Enter");
-      await expect(panel).toContainText("Applied · confirmed by", { timeout: 1500 });
+      await expect(panel).toContainText("Confirmed by", { timeout: 1500 });
     }).toPass({ timeout: 15_000 });
     await expect(jury.getByRole("heading", { level: 1 })).toBeFocused();
   });

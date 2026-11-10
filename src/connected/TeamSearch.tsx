@@ -16,6 +16,7 @@ import {
   unresolvedCount,
   unresolvedLabel,
 } from "./teamSearch";
+import { Meta } from "@/components/meta";
 
 export function TeamSearch({
   id,
@@ -143,8 +144,10 @@ export function TeamSearch({
             id={chosenId}
             className="team-search-chosen mt-1 text-xs text-muted-foreground"
           >
-            {selected.location} ·{" "}
-            {unresolvedLabel(unresolvedCount(issues, selected.id))}
+            <Meta>
+              <span>{selected.location}</span>
+              <span>{unresolvedLabel(unresolvedCount(issues, selected.id))}</span>
+            </Meta>
           </p>
         )}
         {/*
@@ -173,7 +176,10 @@ export function TeamSearch({
             >
               <strong>{team.name}</strong>
               <span className="text-xs text-muted-foreground">
-                {team.location} · {unresolvedLabel(team.unresolved)}
+                <Meta>
+                  <span>{team.location}</span>
+                  <span>{unresolvedLabel(team.unresolved)}</span>
+                </Meta>
               </span>
             </button>
           ))}

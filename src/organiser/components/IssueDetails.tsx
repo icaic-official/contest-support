@@ -14,6 +14,7 @@ import type { Award, HistoryEntry, Issue, Snapshot } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
 import { PersonAvatar, UnresolvedTimer } from "./issueDisplay";
+import { Count, Meta } from "@/components/meta";
 
 function wallTime(value: string): string {
   return new Date(value).toLocaleTimeString([], {
@@ -39,7 +40,14 @@ export function IssueTimers({
       <div className="rounded-xl border p-3">
         <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {!running && <Clock aria-hidden="true" className="size-3" />}
-          {running ? "Unresolved" : "Unresolved · stopped"}
+          {running ? (
+            "Unresolved"
+          ) : (
+            <Meta>
+              <span>Unresolved</span>
+              <span className="opacity-70">stopped</span>
+            </Meta>
+          )}
         </dt>
         <dd className="mt-0.5 text-2xl font-semibold">
           <UnresolvedTimer
@@ -248,7 +256,7 @@ export function AwardReceipt({
             <Clock aria-hidden="true" />
           )}
           {award.withdrawn_at
-            ? "Withdrawn · gives no time"
+            ? "Withdrawn, gives no time"
             : award.applied_at
               ? "Applied externally"
               : "Pending external application"}
@@ -261,13 +269,30 @@ export function AwardReceipt({
           per issue.
         </p>
       )}
-      <p className="mt-2 text-xs text-muted-foreground">
-        Decided by {award.actor_name} · {formatDate(award.at)}
-        {award.applied_at &&
-          ` · confirmed by ${award.applied_name ?? "staff"} · ${formatDate(award.applied_at)}`}
-        {award.withdrawn_at &&
-          ` · withdrawn by ${award.withdrawn_name ?? "staff"} · ${formatDate(award.withdrawn_at)}`}
-      </p>
+      <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+        <p>
+          <Meta>
+            <span>Decided by {award.actor_name}</span>
+            <span className="tabular-nums">{formatDate(award.at)}</span>
+          </Meta>
+        </p>
+        {award.applied_at && (
+          <p>
+            <Meta>
+              <span>Confirmed by {award.applied_name ?? "staff"}</span>
+              <span className="tabular-nums">{formatDate(award.applied_at)}</span>
+            </Meta>
+          </p>
+        )}
+        {award.withdrawn_at && (
+          <p>
+            <Meta>
+              <span>Withdrawn by {award.withdrawn_name ?? "staff"}</span>
+              <span className="tabular-nums">{formatDate(award.withdrawn_at)}</span>
+            </Meta>
+          </p>
+        )}
+      </div>
       {award.withdrawn_at && (
         <p className="mt-1 text-xs text-muted-foreground">
           A withdrawn award stays in the record. This issue cannot take another
@@ -305,16 +330,24 @@ export function ResolutionHistory({
         >
           <div className="flex items-center gap-1.5 text-xs text-status-resolved">
             <CircleCheck aria-hidden="true" className="size-3.5" />
-            {r.reopened_at ? "Previous resolution" : "Resolution summary"} ·{" "}
-            {r.actor_name} · {formatDate(r.at)}
+            <Meta>
+              <span className="font-medium">
+                {r.reopened_at ? "Previous resolution" : "Resolution summary"}
+              </span>
+              <span className="opacity-80">{r.actor_name}</span>
+              <span className="tabular-nums opacity-80">{formatDate(r.at)}</span>
+            </Meta>
           </div>
           <p className="mt-1 text-sm font-medium">{r.summary}</p>
           {r.reopened_at && (
             <p className="mt-2 flex gap-1.5 text-xs text-muted-foreground">
               <RotateCcw aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
               <span>
-                Reopened by {r.reopened_name} · {formatDate(r.reopened_at)}:{" "}
-                {r.reason}
+                <Meta>
+                  <span>Reopened by {r.reopened_name}</span>
+                  <span className="tabular-nums">{formatDate(r.reopened_at)}</span>
+                </Meta>
+                <span className="mt-0.5 block text-foreground/80">{r.reason}</span>
               </span>
             </p>
           )}
@@ -351,7 +384,10 @@ function ActivityEntry({ item, text }: { item: HistoryEntry; text: string }) {
           {internal ? (
             <span className="ml-auto flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
               <Lock aria-hidden="true" className="size-3" />
-              Internal note · staff only
+              <Meta>
+                <span>Internal note</span>
+                <span className="font-normal opacity-80">staff only</span>
+              </Meta>
             </span>
           ) : (
             <span className="ml-auto text-muted-foreground">
@@ -390,11 +426,15 @@ export function ActivityList({
         id={`activity-${issue.id}`}
         className="pb-2 text-xs font-medium text-muted-foreground"
       >
-        Activity · {history.length} {history.length === 1 ? "entry" : "entries"}
+        Activity{" "}
+        <Count unit={history.length === 1 ? "entry" : "entries"}>{history.length}</Count>
       </h2>
       <ol className="space-y-2.5">
         <li className="flex items-center gap-2 pl-2 text-xs text-muted-foreground">
-          Submitted by {issue.reporter_name} · {formatDate(issue.created_at)}
+          <Meta>
+            <span>Submitted by {issue.reporter_name}</span>
+            <span className="tabular-nums">{formatDate(issue.created_at)}</span>
+          </Meta>
         </li>
         {history.map((item) => (
           <ActivityEntry

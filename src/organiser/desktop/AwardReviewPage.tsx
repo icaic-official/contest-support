@@ -72,10 +72,11 @@ export function AwardReviewPage({ props }: { props: ConsolePageProps }) {
                 className="grid gap-6 rounded-xl border bg-card p-5 lg:grid-cols-[1fr_320px]"
               >
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                    <span className="font-mono">ISS-{issue.number}</span>·
-                    <span>{team?.name ?? "Team unavailable"}</span>·
-                    <span>{team?.location}</span>·<span>{issue.category}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground/80">ISS-{issue.number}</span>
+                    <span className="font-medium text-foreground/80">{team?.name ?? "Team unavailable"}</span>
+                    {team?.location && <span>{team.location}</span>}
+                    <span>{issue.category}</span>
                   </div>
                   <h2 className="mt-1.5 font-medium break-words">
                     <button

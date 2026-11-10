@@ -166,7 +166,7 @@ test("lists outstanding work across queue filters and keeps the filters after re
   // Oldest decision first. A zero award and a reopened issue still wait.
   expect(await issueNumbers(page, "To apply")).toEqual(["ISS-3", "ISS-4"]);
   await expect(row(page, 3)).toContainText("No time added");
-  await expect(row(page, 4)).toContainText("Reopened · In progress");
+  await expect(row(page, 4)).toContainText("Reopened, now in progress");
   await expect(row(page, 4)).toContainText(
     "This award relates to an earlier resolution.",
   );
@@ -351,7 +351,7 @@ test("jury withdraws a pending award by keyboard at phone width, and the issue t
   await expect(submit).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(withdraw).toHaveCount(0);
-  await expect(receipt).toContainText("Withdrawn · gives no time");
+  await expect(receipt).toContainText("Withdrawn, gives no time");
   await expect(receipt).toContainText("This issue cannot take another award.");
   await expect(page.getByRole("button", { name: /^(Decide award|Confirm applied)$/ })).toHaveCount(0);
   await page.setViewportSize(phone);
@@ -690,14 +690,14 @@ test("existing details retain public and internal separation and team/session is
 
   await login(page, "contestant", desktop);
   const reports = page.getByRole("navigation", { name: "Reports" });
-  await reports.getByRole("button", { name: /ISS-1 ·/ }).click();
+  await reports.getByRole("button", { name: /ISS-1\s*,/ }).click();
   await expect(
     page.getByText("Public service update", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Private staff investigation", { exact: true }),
   ).toHaveCount(0);
-  await expect(reports.getByRole("button", { name: /ISS-2 ·/ })).toHaveCount(0);
+  await expect(reports.getByRole("button", { name: /ISS-2\s*,/ })).toHaveCount(0);
   await expect(page.getByText(/Award review|Awards/)).toHaveCount(0);
 });
 

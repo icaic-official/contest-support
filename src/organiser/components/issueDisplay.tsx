@@ -16,6 +16,7 @@ import { type Issue, type Resolution, unresolvedTime } from "@/connected/model";
 import { clockDuration } from "@/connected/ui";
 import { cn } from "@/lib/utils";
 import { ageClass, ageTier, initials, placeOf } from "../organiserModel";
+import { Meta } from "@/components/meta";
 
 const statusIcons = {
   open: CircleDashed,
@@ -243,7 +244,7 @@ export function AwardEvidence({ row }: { row: JuryRow }) {
       {award && issue.status !== "resolved" && (
         <Badge variant="outline" className="text-status-escalated">
           <StatusIcon status={issue.status} />
-          Reopened · {statusNames[issue.status]}
+          Reopened, now {statusNames[issue.status].toLowerCase()}
         </Badge>
       )}
       <p className="text-muted-foreground">
@@ -254,8 +255,12 @@ export function AwardEvidence({ row }: { row: JuryRow }) {
       </p>
       {resolution && (
         <p className="text-muted-foreground">
-          Resolved by {resolution.actor_name} ·{" "}
-          <time dateTime={resolution.at}>{formatDate(resolution.at)}</time>
+          <Meta>
+            <span>Resolved by {resolution.actor_name}</span>
+            <time dateTime={resolution.at} className="tabular-nums">
+              {formatDate(resolution.at)}
+            </time>
+          </Meta>
         </p>
       )}
       {resolution?.reopened_at && (

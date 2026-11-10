@@ -25,6 +25,7 @@ import { keepContest, skipToFragment } from "./navigation";
 import { Workspace } from "./Workspace";
 import { WorkflowRetryProvider } from "./WorkflowRetry";
 import { preloadRememberedScreen } from "./lazyScreens";
+import { Meta } from "@/components/meta";
 
 /** The page chrome around the main landmark. */
 type Layout = "dashboard" | "centered" | "landing";
@@ -178,8 +179,10 @@ export function ConnectedApp() {
         </main>
         {layout !== "dashboard" && (
           <footer className="px-6 py-4 text-center text-xs text-muted-foreground">
-            Minsky · Development deployment ·{" "}
-            <a
+            <Meta>
+              <span className="font-medium text-foreground/80">Minsky</span>
+              <span>Development deployment</span>
+              <a
               href={documentationUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -187,8 +190,9 @@ export function ConnectedApp() {
             >
               Documentation{" "}
               <span className="sr-only">(opens in a new tab)</span>↗
-            </a>{" "}
-            · <BuildId />
+              </a>
+              <BuildId />
+            </Meta>
           </footer>
         )}
       </div>

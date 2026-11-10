@@ -5,17 +5,21 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { type LineRules, type PersonLine, linesError, parsePersonLines } from "./eventModel";
+import { Count } from "@/components/meta";
 
 export const fieldClass = "h-11 text-base md:text-sm";
 
 /** A card with a heading for one task of a tab. */
 export function Panel({
   title,
+  count,
   description,
   children,
   className,
 }: {
   title: string;
+  /** A figure that belongs to the heading, such as the seats of a contest. */
+  count?: number;
   description?: string;
   children: ReactNode;
   className?: string;
@@ -25,6 +29,7 @@ export function Panel({
     <section aria-labelledby={id} className={cn("rounded-xl border bg-card p-4 sm:p-5", className)}>
       <h2 id={id} className="text-sm font-semibold">
         {title}
+        {count !== undefined && <Count className="align-middle">{count}</Count>}
       </h2>
       {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       <div className="mt-4">{children}</div>

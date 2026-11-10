@@ -60,6 +60,7 @@ import {
   visibleIssues,
 } from "../organiserModel";
 import { type CardAction, EmptyList, IssueCard } from "./PhoneParts";
+import { Meta, Stat } from "@/components/meta";
 
 /** A sheet that the issue view opens when it appears. */
 export type IssueSheet = IssueSheetKind;
@@ -245,7 +246,10 @@ export function MineTab(props: PhoneTabProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        {active.length} active · {resolved.length} resolved
+        <Meta>
+          <Stat value={active.length} label="active" />
+          <Stat value={resolved.length} label="resolved" />
+        </Meta>
       </p>
       {active.length ? (
         <IssueList issues={active} props={props} />
@@ -457,10 +461,10 @@ export function AwardsTab(props: PhoneTabProps) {
                   className="w-full rounded-md text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
                 >
                   <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-mono">ISS-{issue.number}</span>·
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground/80">ISS-{issue.number}</span>
                     <span className="truncate">
                       {team?.name ?? "Team unavailable"}
-                      {team?.location && ` · ${team.location}`}
+                      {team?.location && <>{" "}<span className="ml-1.5 opacity-70">{team.location}</span></>}
                     </span>
                     <span className="ml-auto shrink-0">
                       <UnresolvedTimer
@@ -492,7 +496,7 @@ export function AwardsTab(props: PhoneTabProps) {
                 {award?.applied_at && (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-status-resolved">
                     <CheckCheck aria-hidden="true" className="size-3.5" />
-                    Applied · confirmed by {award.applied_name}
+                    Confirmed by {award.applied_name}
                   </p>
                 )}
                 {!archived && list === "decide" && props.member.roles.includes("jury") && (

@@ -17,14 +17,14 @@ async function openReport(page: Page, number: number) {
   });
   await page
     .getByRole("navigation", { name: "Reports" })
-    .getByRole("button", { name: new RegExp(`ISS-${number} ·`) })
+    .getByRole("button", { name: new RegExp(`ISS-${number}\\s*,`) })
     .click();
 }
 
 const cases = [
-  { minutes: 0, heading: "No time added", figure: /^0\s*minutes$/, step: "Decided · No time added" },
-  { minutes: 1, heading: "1 minute", figure: /^\+1\s*minute$/, step: "Decided · 1 minute" },
-  { minutes: 5, heading: "5 minutes", figure: /^\+5\s*minutes$/, step: "Decided · 5 minutes" },
+  { minutes: 0, heading: "No time added", figure: /^0\s*minutes$/, step: "Decided: No time added" },
+  { minutes: 1, heading: "1 minute", figure: /^\+1\s*minute$/, step: "Decided: 1 minute" },
+  { minutes: 5, heading: "5 minutes", figure: /^\+5\s*minutes$/, step: "Decided: 5 minutes" },
 ];
 
 for (const { minutes, heading, figure, step } of cases) {

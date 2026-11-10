@@ -234,7 +234,7 @@ export function MinePage({ props }: { props: ConsolePageProps }) {
     <div className="space-y-6">
       <PageHeader
         title="Assigned to me"
-        description={`${active.length} active · ${resolved.length} resolved. You stay the owner during a handoff until a specialist accepts.`}
+        description={`${active.length} active and ${resolved.length} resolved. You stay the owner during a handoff until a specialist accepts.`}
       />
       <IssueTable
         issues={active}

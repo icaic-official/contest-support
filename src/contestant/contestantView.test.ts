@@ -184,7 +184,7 @@ describe("trackerSteps", () => {
       time,
     );
     expect(states(steps)).toEqual(["done", "done", "current", "todo"]);
-    expect(steps[1]!.detail).toBe("Priya Raman · 10:02");
+    expect(steps[1]!.detail).toBe("Priya Raman, 10:02");
     expect(steps[2]!.detail).toBe("Waiting for a specialist");
   });
 
@@ -203,7 +203,7 @@ describe("trackerSteps", () => {
     ]);
     const steps = trackerSteps(resolved, award, time);
     expect(states(steps)).toEqual(["done", "done", "done", "done"]);
-    expect(steps[3]!.detail).toBe("Decided · 10 minutes");
+    expect(steps[3]!.detail).toBe("Decided: 10 minutes");
   });
 
   it("words a zero-minute and a one-minute award without a plus sign or a wrong plural", () => {
@@ -215,8 +215,8 @@ describe("trackerSteps", () => {
     });
     const detail = (minutes: number) =>
       trackerSteps(resolved, { ...award, minutes }, time)[3]!.detail;
-    expect(detail(0)).toBe("Decided · No time added");
-    expect(detail(1)).toBe("Decided · 1 minute");
+    expect(detail(0)).toBe("Decided: No time added");
+    expect(detail(1)).toBe("Decided: 1 minute");
   });
 
   it("keeps an award after reopening while resolution is pending", () => {

@@ -18,6 +18,7 @@ import type { Snapshot } from "@/connected/model";
 import { cn } from "@/lib/utils";
 import { ActionDialog } from "./ActionDialog";
 import { ActionSheet } from "./ActionSheet";
+import { Count } from "@/components/meta";
 
 function uploadedText(item: { uploader_name: string; uploaded_at: string }) {
   return `Image uploaded by ${item.uploader_name} on ${new Date(item.uploaded_at).toLocaleString()}`;
@@ -377,7 +378,10 @@ export function OrganiserImages({
         id={`images-${issueId}`}
         className="pb-2 text-xs font-medium text-muted-foreground"
       >
-        Images · {images.shown.length} of {maxImages}
+        Images{" "}
+        <Count unit="images">
+          {images.shown.length}/{maxImages}
+        </Count>
       </h2>
       {images.shown.length === 0 && !canUpload && (
         <p className="text-sm text-muted-foreground">No images attached.</p>

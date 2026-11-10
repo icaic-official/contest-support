@@ -303,7 +303,7 @@ export function ConsoleSidebar({
                         <TooltipTrigger asChild>{link}</TooltipTrigger>
                         <TooltipContent side="right">
                           {label}
-                          {count ? ` · ${count}` : ""}
+                          {count ? <>{" "}<span className="ml-1.5 tabular-nums opacity-70">{count}</span></> : null}
                         </TooltipContent>
                       </Tooltip>
                     ) : (
@@ -376,7 +376,8 @@ export function ConsoleSidebar({
           <Tooltip>
             <TooltipTrigger asChild>{accountButton}</TooltipTrigger>
             <TooltipContent side="right">
-              {personName} · Account settings
+              <span className="block font-medium">{personName}</span>
+              <span className="block opacity-70">Account settings</span>
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -603,9 +604,9 @@ export function CommandPalette({
                     <MapPin aria-hidden="true" />
                     <span className="min-w-0 flex-1 truncate">
                       {team.name}
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {team.location}
+                      {" "}
+                      <span className="ml-1.5 text-muted-foreground">
+                        {team.location}
                       </span>
                     </span>
                     <span className="text-xs text-muted-foreground">

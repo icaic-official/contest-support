@@ -180,7 +180,7 @@ export function trackerSteps(
         assigned && issue.first_assigned_at
           ? [issue.owner_name, formatTime(issue.first_assigned_at)]
               .filter(Boolean)
-              .join(" · ")
+              .join(", ")
           : "Waiting for a helper",
       done: assigned,
     },
@@ -199,7 +199,7 @@ export function trackerSteps(
       id: "award",
       label: "Time award",
       detail: award
-        ? `Decided · ${awardMinutesLabel(award.minutes)}`
+        ? `Decided: ${awardMinutesLabel(award.minutes)}`
         : resolved
           ? "The jury can decide an award"
           : "After resolution",

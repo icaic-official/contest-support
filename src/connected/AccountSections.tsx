@@ -51,6 +51,7 @@ import { formatDate, relativeAge } from "./labels";
 import type { Membership, Snapshot } from "./model";
 import { canOpenPage, workspacePaths } from "./navigation";
 import type { ShellProps } from "./shell";
+import { Meta } from "@/components/meta";
 
 /** What every section reads. The page builds it once. */
 export interface AccountSectionProps {
@@ -549,13 +550,13 @@ export function ActivitySection({
                     />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs text-muted-foreground">
-                        <span className="font-mono">ISS-{item.issueNumber}</span>
-                        {" · "}
-                        {label}
-                        {" · "}
-                        <time dateTime={item.at} title={formatDate(item.at)}>
-                          {relativeAge(item.at, now)}
-                        </time>
+                        <Meta>
+                          <span className="font-mono">ISS-{item.issueNumber}</span>
+                          <span>{label}</span>
+                          <time dateTime={item.at} title={formatDate(item.at)} className="tabular-nums">
+                            {relativeAge(item.at, now)}
+                          </time>
+                        </Meta>
                       </p>
                       <p className="mt-0.5 line-clamp-2 text-sm break-words">
                         {item.text}

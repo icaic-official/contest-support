@@ -68,7 +68,7 @@ export function PeopleTab({ data, state }: TabProps) {
           }}
         />
       </Panel>
-      <Panel title={`People · ${data.people.length}`}>
+      <Panel title="People">
         {data.people.length === 0 ? (
           <p className="text-sm text-muted-foreground">No staff accounts yet.</p>
         ) : (

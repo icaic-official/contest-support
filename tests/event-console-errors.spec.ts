@@ -39,7 +39,7 @@ test("a refusal keeps the typed lines, and a lost answer clears them once the se
   await page.getByRole("button", { name: "Import entrants (1)", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   // The next read lists the handle, which must not erase what the person typed.
-  await expect(page.getByText("Entrants · 4")).toBeVisible();
+  await expect(page.getByRole("list", { name: "All entrants" }).getByRole("listitem")).toHaveCount(4);
   await expect(box).toHaveValue("Team Lyra Two, team-lyra");
 
   local.loseNext("/api/manage", "response");

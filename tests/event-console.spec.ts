@@ -27,6 +27,7 @@ async function openConsole(page: Page) {
 }
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
+const entrantRows = (page: Page) => page.getByRole("list", { name: "All entrants" }).getByRole("listitem");
 
 /** The credential sheet's password for one account, read once. */
 async function passwordOf(sheet: Locator, name: string): Promise<string> {
@@ -60,7 +61,7 @@ test("an event admin creates a contest, imports entrants, assigns them, and a co
   expect(local.bodies("/api/credentials")).toHaveLength(1);
   await sheet.getByRole("button", { name: "Done", exact: true }).click();
   // The fixture already holds three entrants, so the list shows five.
-  await expect(page.getByText("Entrants · 5")).toBeVisible();
+  await expect(entrantRows(page)).toHaveCount(5);
 
   await tab(page, "Assignments").click();
   await page.getByLabel("Contest", { exact: true }).selectOption({ label: "Spring finals" });
@@ -254,7 +255,7 @@ test.describe("the site dashboard", () => {
 
 test.describe("the console's roster editor", () => {
   const box = (page: Page) => page.getByLabel("Entrants, one per line: name, username", { exact: true });
-  const count = (page: Page) => page.getByText(/^Entrants · \d+$/);
+  const count = (page: Page) => entrantRows(page).count();
   const openEntrants = async (page: Page) => {
     await page.setViewportSize(desktop);
     await openConsole(page);
@@ -302,7 +303,7 @@ test.describe("the console's roster editor", () => {
 
   test("a retry after a lost request sends the same request ID", async ({ page, local }) => {
     await openEntrants(page);
-    const before = await count(page).textContent();
+    const before = await count(page);
     const sent: Array<string | null> = [];
     await page.route("**/api/manage", (route) => {
       sent.push(route.request().postData());
@@ -315,7 +316,7 @@ test.describe("the console's roster editor", () => {
     await expect(box(page)).toHaveValue("Team Zeta, team-zeta");
     await page.getByRole("button", { name: "Import entrants (1)", exact: true }).click();
     await closeSheet(page);
-    expect(await count(page).textContent()).not.toBe(before);
+    expect(await count(page)).not.toBe(before);
     expect(local.eventCode).not.toBe("");
     expect(new Set(sent).size).toBe(1);
   });
@@ -327,7 +328,7 @@ test.describe("the console's roster editor", () => {
     await page.getByRole("button", { name: "Import entrants (1)", exact: true }).click();
     await expect(page.getByRole("alert")).toBeVisible();
     // The read after the lost answer shows the entrant, so the box clears itself.
-    await expect(page.getByText("Entrants · 4")).toBeVisible();
+    await expect(entrantRows(page)).toHaveCount(4);
     await expect(box(page)).toHaveValue("");
     expect(await local.rows("SELECT id FROM entrants WHERE name = 'Team Zeta' AND event_id = (SELECT id FROM events WHERE code = ?)", local.eventCode)).toHaveLength(1);
   });

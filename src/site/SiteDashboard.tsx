@@ -110,7 +110,7 @@ export function SiteDashboard({
             <div className="space-y-5">
               <Events site={site} state={state} />
               {site.deletions.length > 0 && (
-                <SiteCard title={`Deletions · ${site.deletions.length}`} headingId={deletionsHeadingId}>
+                <SiteCard title="Deletions" headingId={deletionsHeadingId}>
                   <Deletions deletions={site.deletions} />
                 </SiteCard>
               )}

@@ -118,7 +118,7 @@ async function showTeams(page: Page) {
     await expect(page.getByRole("heading", { level: 1, name: "Team locations", exact: true })).toBeVisible();
   } else {
     await page.getByRole("navigation", { name: "Organizer sections" }).getByRole("button", { name: "Session", exact: true }).click();
-    await page.getByText(/^Team locations · \d+$/).click();
+    await page.getByText("Team locations", { exact: true }).click();
   }
 }
 

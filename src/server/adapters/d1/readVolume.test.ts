@@ -197,8 +197,10 @@ type ReadBody = Omit<Snapshot, 'server_time'> & { server_time?: string };
 
 async function snapshot(db: D1Connection, n: number, sql = snapshotSql) {
   const caller = { accountId: `acc-${n}`, loginId: `login-${n}` };
+  // The reference and the snapshot bind the session ID a different number of times after the five leading binds.
+  const sessionBinds = (sql.match(/\?/g) ?? []).length - 5;
   const result = await db.prepare(sql)
-    .bind(caller.accountId, caller.loginId, ...contestDataBindings(caller, 'sess-1'), ...Array<string>(9).fill('sess-1'))
+    .bind(caller.accountId, caller.loginId, ...contestDataBindings(caller, 'sess-1'), ...Array<string>(sessionBinds).fill('sess-1'))
     .all<{ snapshot: string }>();
   const row = result.results[0];
   const body = row ? (JSON.parse(row.snapshot) as ReadBody) : null;

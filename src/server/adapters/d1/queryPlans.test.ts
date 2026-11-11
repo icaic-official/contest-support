@@ -33,12 +33,13 @@ const queries: Record<string, string> = {
 };
 
 // Both snapshots materialize the resolver row as `access` and read it as `c`.
-// The session snapshot also materializes `visible_issues`, and reads it and
-// `access` as `i` and `a`. A scan of those rows stays in memory.
+// The session snapshot also materializes `extra_minutes` and reads it as `x`,
+// and reads `access` as `a` to compute it. A scan of those rows stays in memory.
+// The pattern leaves out `i`, so a scan of `issues` fails the test.
 // readVolume.test.ts catches a scan of a real table behind an alias with the
 // same name, because it counts rows read on a large session.
 const materializedScans = new Map([
-  [snapshotSql, /^SCAN (?:access|visible_issues|extra_minutes|a|i|c|x)(?: LEFT-JOIN)?$/],
+  [snapshotSql, /^SCAN (?:a|c|x)(?: LEFT-JOIN)?$/],
   [announcementSnapshotSql, /^SCAN (?:access|c)$/],
   // The list materializes the caller's contests with their extra minutes as `viewer`, and reads it as `v`.
   // It must not allow `c`: `extraMinutesSql` reads `contest_awards` as `c`, so a scan of that table would pass.

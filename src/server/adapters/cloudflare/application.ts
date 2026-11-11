@@ -20,10 +20,12 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 }
 
 // D1 compiles every statement on every call, and SQLite compiles a CTE again at
-// each place that names it. So the resolver is named twice: once as `c` in the
-// FROM clause, whose columns every section reads, and once in visible_issues,
-// because a CTE cannot read `c`. Without a seat, `c` is NULL and every section
-// is empty. visible_issues reads each side of its OR through its own index.
+// each place that names it. So the resolver is named once, as `c` in the FROM
+// clause, and every section reads the caller's seat from `c`. Without a seat,
+// `c` is NULL and every section is empty. A CTE that read `access` for the five
+// issue sections made hosted D1 refuse the statement with "VIEWs and/or
+// subqueries nested too deep", which local SQLite accepts. So those sections
+// read `issues` directly, through readableIssue.
 // The audit section takes its key from `c`, so a caller who is not an admin
 // reads no audit row. A team member reads the own team by key. The memberships
 // foreign key keeps that team in the same session.
@@ -31,11 +33,16 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 // only for a contest with a schedule, because the clock and the intake state
 // both use it. The contest keeps today's reads without a schedule.
 const extra = 'x.minutes';
+/**
+ * The issues that seat `c` reads: a team member reads the own team's issues and
+ * staff read every issue of the contest. SQLite reads each side of the OR
+ * through its own index on `issues`.
+ */
+const readableIssue = `((i.session_id = c.session_id AND i.team_id = c.team_id)
+  OR (c.staff = 1 AND i.session_id = c.session_id))`;
 export const snapshotSql = `WITH login AS (${currentReadyLoginSql}), access AS MATERIALIZED (${contestDataSql('caller')}),
   extra_minutes AS MATERIALIZED (SELECT ${viewerExtraSql('s', 'a.team_id')} AS minutes
-    FROM access a JOIN sessions s ON s.id = a.session_id),
-  visible_issues AS MATERIALIZED (SELECT i.* FROM access a CROSS JOIN issues i
-    WHERE (i.session_id = ? AND i.team_id = a.team_id) OR (a.staff = 1 AND i.session_id = ?))
+    FROM access a JOIN sessions s ON s.id = a.session_id)
 SELECT json_object(
   'session', (SELECT json_object('id', s.id, 'event_id', s.event_id, 'name', s.name,
     'intake_open', json(CASE WHEN ${intakeOpenSql('s', extra)} THEN 'true' ELSE 'false' END),
@@ -68,32 +75,32 @@ SELECT json_object(
       'category', i.category, 'description', i.description, 'status', i.status,
       'created_at', i.created_at, 'first_assigned_at', i.first_assigned_at,
       'owner', i.owner, 'owner_name', i.owner_name, 'resolved_at', i.resolved_at,
-      'revision', i.public_revision) AS row FROM visible_issues i ORDER BY i.number DESC, i.id)), '[]')),
+      'revision', i.public_revision) AS row FROM issues i WHERE ${readableIssue} ORDER BY i.number DESC, i.id)), '[]')),
   'resolutions', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', r.id, 'session_id', r.session_id, 'issue_id', r.issue_id,
       'actor', r.actor, 'actor_name', r.actor_name, 'at', r.at, 'summary', r.summary,
       'reopened_at', r.reopened_at, 'reopened_by', r.reopened_by,
       'reopened_name', r.reopened_name, 'reason', r.reason) AS row
-    FROM resolutions r JOIN visible_issues i ON i.id = r.issue_id ORDER BY r.at, r.id)), '[]')),
+    FROM resolutions r JOIN issues i ON i.id = r.issue_id WHERE ${readableIssue} ORDER BY r.at, r.id)), '[]')),
   'history', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', h.id, 'issue_id', h.issue_id, 'at', h.at,
       'actor', h.actor, 'actor_name', h.actor_name, 'text', h.text, 'visibility', h.visibility) AS row
-    FROM history h JOIN visible_issues i ON i.id = h.issue_id
-    WHERE h.visibility = 'public' OR c.staff = 1 ORDER BY h.at, h.id)), '[]')),
+    FROM history h JOIN issues i ON i.id = h.issue_id
+    WHERE ${readableIssue} AND (h.visibility = 'public' OR c.staff = 1) ORDER BY h.at, h.id)), '[]')),
   'awards', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', w.id, 'issue_id', w.issue_id, 'resolution_id', w.resolution_id,
       'minutes', w.minutes, 'explanation', w.explanation, 'actor_name', w.actor_name,
       'at', w.at, 'applied_at', w.applied_at, 'applied_name', w.applied_name,
       'withdrawn_at', w.withdrawn_at, 'withdrawn_name', w.withdrawn_name) AS row
-    FROM awards w JOIN visible_issues i ON i.id = w.issue_id
-    WHERE w.withdrawn_at IS NULL OR c.staff = 1 ORDER BY w.at, w.id)), '[]')),
+    FROM awards w JOIN issues i ON i.id = w.issue_id
+    WHERE ${readableIssue} AND (w.withdrawn_at IS NULL OR c.staff = 1) ORDER BY w.at, w.id)), '[]')),
   'attachments', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'uploader', x.uploader,
       'uploader_name', x.uploader_name, 'uploaded_at', x.uploaded_at,
       'visibility', x.visibility, 'byte_size', x.byte_size, 'content_type', x.content_type,
       'original_name', x.original_name) AS row
-    FROM visible_issues i CROSS JOIN issue_images x
-    WHERE x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR c.staff = 1)
+    FROM issues i CROSS JOIN issue_images x
+    WHERE ${readableIssue} AND x.issue_id = i.id AND x.state = 'ready' AND (x.visibility = 'public' OR c.staff = 1)
     ORDER BY x.uploaded_at, x.id)), '[]')),
   'pending_removals', json(COALESCE((SELECT json_group_array(json(row)) FROM (
     SELECT json_object('id', x.id, 'issue_id', x.issue_id, 'original_name', x.original_name) AS row
@@ -208,7 +215,7 @@ export class D1ApplicationService {
   async snapshot(caller: Caller, sessionId: string): Promise<Snapshot> {
     if (!z.uuid().safeParse(sessionId).success) throw new AuthenticationError(400, 'Invalid session or account.');
     const row = await this.statement(snapshotSql, caller.accountId, caller.loginId, ...contestDataBindings(caller, sessionId),
-      ...Array<string>(9).fill(sessionId)).first<{ snapshot: string }>();
+      ...Array<string>(7).fill(sessionId)).first<{ snapshot: string }>();
     if (!row) throw new AuthenticationError(403, 'Sign in again or change your temporary password.');
     return snapshotSchema.parse(JSON.parse(row.snapshot));
   }

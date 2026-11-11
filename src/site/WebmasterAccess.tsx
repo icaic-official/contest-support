@@ -1,17 +1,18 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { ShieldCheck } from "lucide-react";
+import { ClipboardList, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { SessionData } from "@/connected/hooks/useSessionSnapshot";
-import { sitePath } from "@/connected/navigation";
+import { eventPath, sitePath } from "@/connected/navigation";
 import { JoinContests } from "./JoinContests";
 import { joinContest, useSite } from "./useSite";
 
 /**
  * What a webmaster sees when no contest is open to them: the contests to
  * join while the site restricts webmaster reads, and the way to the site
- * page, where the setting changes. Anyone else sees `fallback`.
+ * page, where the setting changes. An event admin sees `fallback` and the way
+ * to the event console. Anyone else sees `fallback`.
  */
 export function WebmasterAccess({
   data,
@@ -25,7 +26,21 @@ export function WebmasterAccess({
 }) {
   const state = useSite();
   const { site } = state;
-  if (!site) return fallback;
+  if (!site) {
+    // The contest list names the level of the person even when no snapshot loads.
+    if (!data.sessions.some(({ manage }) => manage === "event")) return fallback;
+    return (
+      <div className="grid w-full max-w-md gap-4">
+        {fallback}
+        <Button asChild variant="outline" className="h-11">
+          <Link to={eventPath()}>
+            <ClipboardList aria-hidden="true" />
+            Open the event console
+          </Link>
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="grid w-full max-w-md gap-4">
       {state.error && (

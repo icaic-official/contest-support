@@ -237,7 +237,7 @@ describe('Cloudflare application HTTP boundary', () => {
     const lines = logged.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown);
     logged.mockRestore();
     expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ outcome: 'unknown' });
+    expect(await response.json()).toEqual({ outcome: 'unknown', requestId: 'ray-2' });
     expect(lines).toEqual([{
       level: 'error', event: 'workflow.failed', route: '/api/workflow', method: 'POST', requestId: 'ray-2',
       status: 503, phase: 'read', errorName: 'Error', errorMessage: engine,

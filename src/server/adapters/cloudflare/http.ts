@@ -54,6 +54,15 @@ export function privateJson(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: privateHeaders });
 }
 
+/**
+ * Adds the `cf-ray` ID to the body of a 503. The log line of the failure has the
+ * same ID, so a person who quotes it lets the owner find the line.
+ */
+function withRequestId<T extends object>(request: Request, body: T): T | (T & { requestId: string }) {
+  const requestId = request.headers.get('cf-ray');
+  return requestId === null ? body : { ...body, requestId };
+}
+
 export interface ApplicationHttpServices {
   auth: Pick<AuthenticationService, 'current'>;
   application: Pick<D1ApplicationService, 'contests' | 'snapshot'>;
@@ -164,7 +173,8 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);
         const result = await services.workflow.execute(caller, parsed.data.sessionId, parsed.data.requestId, parsed.data.command,
           (phase, error) => logEvent('error', 'workflow.failed', { ...requestFields(request), status: 503, phase, error, ...d1ErrorFields(error) }));
-        if (result.outcome !== 'committed') return privateJson(result, result.outcome === 'rejected' ? 409 : 503);
+        if (result.outcome === 'rejected') return privateJson(result, 409);
+        if (result.outcome !== 'committed') return privateJson(withRequestId(request, result), 503);
         // The commit is final. A failed read must not turn it into an error, so the client reads again.
         let snapshot: Awaited<ReturnType<ApplicationHttpServices['application']['snapshot']>> | undefined;
         try { snapshot = await services.application.snapshot(caller, parsed.data.sessionId); } catch { /* The client reads again. */ }
@@ -229,7 +239,11 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
         validation: error.validation, restart: error.restart, incomplete: error.incomplete }, 409);
       if (error instanceof z.ZodError || error instanceof URIError) return privateJson({ error: 'The request is invalid.' }, 400);
       logEvent('error', 'http.unhandled_error', { ...requestFields(request), status: 503, error, ...d1ErrorFields(error) });
-      return privateJson({ error: 'The request could not be completed. Its write outcome may be unknown.' }, 503);
+      // A GET writes nothing, so it must not say that a write may have happened.
+      const message = request.method === 'GET'
+        ? 'Minsky could not load this. Try again in a moment.'
+        : 'The request could not be completed. Its write outcome may be unknown.';
+      return privateJson(withRequestId(request, { error: message }), 503);
     }
   };
 }

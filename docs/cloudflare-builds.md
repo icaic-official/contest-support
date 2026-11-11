@@ -233,7 +233,7 @@ To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
 | Event | Meaning |
 | --- | --- |
 | `worker.unhandled_error` | A request to `/api` failed. The client got a 503. |
-| `http.unhandled_error` | An application route failed. The client got a 503. When D1 refused a statement, `errorMessage` holds the first 300 characters of the D1 text, such as `D1_ERROR: ...: SQLITE_ERROR`. |
+| `http.unhandled_error` | An application route failed. The client got a 503. A GET gets "Minsky could not load this." Any other method gets "Its write outcome may be unknown." The 503 body carries `requestId`, the same `cf-ray` value as the log line, when the request has one, and the client shows it as a reference. When D1 refused a statement, `errorMessage` holds the first 300 characters of the D1 text, such as `D1_ERROR: ...: SQLITE_ERROR`. |
 | `workflow.failed` | A workflow command ended with an unknown outcome. The client got a 503. The `phase` field says where. `read` means this attempt wrote nothing. `commit` means the write may have happened. `retries` means every attempt asked for another one, and the line has no error fields. When D1 refused a statement, `errorMessage` holds the D1 text. |
 | `authentication.unhandled_error` | Sign-in or account handling failed. The client got a 503. |
 | `live.coordinator_error` | The live-update Durable Object failed a request. |

@@ -84,6 +84,17 @@ const failureSchema = z.object({
   restart: z.boolean().exactOptional(), incomplete: z.boolean().exactOptional(),
 });
 
+const referenceSchema = z.object({ requestId: z.string().regex(/^[A-Za-z0-9-]{1,40}$/) });
+
+/**
+ * Adds the request ID of a failed request to its text. The ID is the one that
+ * the Worker logs, so a person can quote it. A body with no short plain ID adds nothing.
+ */
+function withReference(message: string, body: unknown): string {
+  const reference = referenceSchema.safeParse(body);
+  return reference.success ? `${message} Reference: ${reference.data.requestId}.` : message;
+}
+
 /** Each instance uses one same-origin deployment and independent subscriptions. */
 export function createCloudflareBackend(options: {
   origin: string;
@@ -115,7 +126,7 @@ export function createCloudflareBackend(options: {
     const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const error = failureSchema.safeParse(body);
-      const message = error.success ? error.data.error : 'The request could not be completed.';
+      const message = withReference(error.success ? error.data.error : 'The request could not be completed.', body);
       throw response.status < 500 ? new RequestRefusedError(message) : new Error(message);
     }
     return body;
@@ -125,7 +136,7 @@ export function createCloudflareBackend(options: {
     const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const failure = failureSchema.safeParse(body);
-      throw new ImageRequestError(failure.success ? failure.data.error : 'The image request failed.',
+      throw new ImageRequestError(withReference(failure.success ? failure.data.error : 'The image request failed.', body),
         failure.success ? failure.data : undefined);
     }
     return body;
@@ -219,13 +230,14 @@ export function createCloudflareBackend(options: {
 
   async function executeWorkflow(sessionId: string, requestId: string, command: Command): Promise<{ issueId: string; snapshot: Snapshot | undefined }> {
     const response = await post('/api/workflow', { sessionId, requestId, command });
-    const result = workflowSchema.safeParse(await response.json().catch(() => undefined));
+    const body: unknown = await response.json().catch(() => undefined);
+    const result = workflowSchema.safeParse(body);
     // Only the endpoint's typed rejection confirms that no command committed.
     if (result.success && result.data.outcome === 'rejected') {
       throw new WorkflowRejectedError(workflowRejectionMessage(result.data.reason));
     }
     if (!response.ok || !result.success || result.data.outcome !== 'committed') {
-      throw new Error('Workflow outcome is unknown. Retry the same request.');
+      throw new Error(withReference('Workflow outcome is unknown. Retry the same request.', body));
     }
     const snapshot = snapshotSchema.safeParse(result.data.snapshot);
     return { issueId: result.data.issueId, snapshot: snapshot.success ? snapshot.data : undefined };

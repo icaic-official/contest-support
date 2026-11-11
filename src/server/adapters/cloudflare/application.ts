@@ -34,7 +34,7 @@ export function currentReadyLoginBindings(caller: Caller): D1Value[] {
 // both use it. The contest keeps today's reads without a schedule.
 const extra = 'x.minutes';
 /**
- * The issues that seat `c` reads: a team member reads the own team's issues and
+ * The issues that seat `c` reads. A team member reads the own team's issues, and
  * staff read every issue of the contest. SQLite reads each side of the OR
  * through its own index on `issues`.
  */

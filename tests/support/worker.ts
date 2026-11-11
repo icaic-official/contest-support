@@ -2,6 +2,7 @@ import { test as base, expect, type BrowserContext, type Page, type WebSocketRou
 import { randomUUID } from 'node:crypto';
 import type {
   CredentialIssue, EventCode, EventConsole, IssuedCredential, ManageCommand, ManageReceipt, PersonAvatar, SignInTarget,
+  SiteOverview,
 } from '../../src/backend/contracts';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
@@ -293,6 +294,9 @@ export class FakeWorker extends FixtureWorker {
   /** The event console that the signed-in account reads. Undefined refuses the read. */
   eventConsole: EventConsole | undefined;
 
+  /** The site that the signed-in account reads. Null is a person who is not a webmaster. */
+  site: SiteOverview | null = null;
+
   /** Receives each credential request. Throw an AuthenticationError to reject. */
   issue: (input: CredentialIssue) => Promise<IssuedCredential[]> = async () => {
     throw new AuthenticationError(403, 'Only a webmaster can issue webmaster passwords.');
@@ -326,7 +330,7 @@ export class FakeWorker extends FixtureWorker {
     },
     workflow: { execute: (_caller, _sessionId, requestId, command) => this.workflow(command as Command, requestId) },
     manage: {
-      site: async () => null,
+      site: async () => this.site,
       event: async () => {
         if (!this.eventConsole) throw new AuthenticationError(403, 'Only an event admin or a webmaster can change this event.');
         return this.eventConsole;

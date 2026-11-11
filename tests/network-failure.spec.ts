@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import type { SiteOverview } from '../src/backend/contracts';
 import {
   type FakeWorker,
   SESSION_ID,
@@ -44,6 +45,27 @@ test('a lost session read blames the connection, not the account', async ({ page
   await expect(page.getByText('Minsky could not load your session.'))
     .toBeVisible();
   await expect(page.getByText(/ask an organizer to assign your membership/)).toHaveCount(0);
+});
+
+const site: SiteOverview = {
+  webmasters: [], restrictWebmasterReads: false, events: [], deletions: [], contestsToJoin: [],
+};
+
+test('a webmaster keeps the way to the site page and Sign out when the session read fails', async ({ page, api }) => {
+  api.site = site;
+  await page.route(snapshotRequest, (route) => route.abort('failed'));
+  await signInWithoutSnapshot(page, api);
+  await expect(page.getByText('Minsky could not load your session.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open the site page', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+});
+
+test('a webmaster whose site restricts reads still sees why the session read failed', async ({ page, api }) => {
+  api.site = { ...site, restrictWebmasterReads: true, contestsToJoin: [{ id: SESSION_ID, name: 'Contest to join', eventName: 'Fixture event' }] };
+  await page.route(snapshotRequest, (route) => route.abort('failed'));
+  await signInWithoutSnapshot(page, api);
+  await expect(page.getByText('Minsky could not load your session.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open the site page', exact: true })).toBeVisible();
 });
 
 test('an account without a membership still gets the organizer hint', async ({ page, api }) => {

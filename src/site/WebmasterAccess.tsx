@@ -16,9 +16,12 @@ import { joinContest, useSite } from "./useSite";
 export function WebmasterAccess({
   data,
   fallback,
+  failed,
 }: {
   data: SessionData;
   fallback: ReactNode;
+  /** True when `fallback` shows an error. It then stays, because the contests to join would hide it. */
+  failed: boolean;
 }) {
   const state = useSite();
   const { site } = state;
@@ -32,7 +35,7 @@ export function WebmasterAccess({
           </AlertDescription>
         </Alert>
       )}
-      {site.restrictWebmasterReads ? (
+      {site.restrictWebmasterReads && !failed ? (
         <JoinContests
           contests={site.contestsToJoin}
           busy={state.busy}

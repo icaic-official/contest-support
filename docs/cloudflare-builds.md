@@ -233,7 +233,7 @@ To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
 | Event | Meaning |
 | --- | --- |
 | `worker.unhandled_error` | A request to `/api` failed. The client got a 503. |
-| `http.unhandled_error` | An application route failed. The client got a 503. |
+| `http.unhandled_error` | An application route failed. The client got a 503. When D1 refused a statement, `errorMessage` holds the first 300 characters of the D1 text, such as `D1_ERROR: ...: SQLITE_ERROR`. |
 | `authentication.unhandled_error` | Sign-in or account handling failed. The client got a 503. |
 | `live.coordinator_error` | The live-update Durable Object failed a request. |
 | `live.alarm_error` | The Durable Object alarm failed. |
@@ -245,6 +245,7 @@ To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
 Each event has `level` and `event`. It can also have `route`, `method`, `requestId`, `status`, `task`, counts, `errorName`, and `errorCode`.
 `requestId` is the `cf-ray` value of the request.
 The logs never contain passwords, cookies, tokens, IP addresses, request bodies, image data, message text, or error messages.
+The one exception is `errorMessage` on `http.unhandled_error`, and only for a D1 error. It names a SQLite problem and never a bound value.
 A migration failure is not a Worker log. It appears in the Workers Builds log of the failed build.
 
 ### Change the D1 schema

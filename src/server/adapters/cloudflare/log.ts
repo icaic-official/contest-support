@@ -2,7 +2,8 @@
  * Structured operator log. Each event is one JSON object on one line, so Workers
  * Logs can index every field. The field list is closed on purpose. It has no
  * place for bodies, headers, cookies, tokens, IP addresses, SQL, or error
- * messages, because a message can carry user input.
+ * messages, because a message can carry user input. The one exception is the
+ * engine text of a D1 error, which `d1ErrorFields` adds.
  */
 export interface LogFields {
   readonly route?: string;
@@ -20,6 +21,8 @@ export interface LogFields {
   readonly delivered?: number;
   readonly failed?: number;
   readonly error?: unknown;
+  /** The engine text of a D1 error, cut short. Set it only with `d1ErrorFields`. */
+  readonly errorMessage?: string;
 }
 
 export type LogLevel = 'error' | 'warn';
@@ -40,6 +43,19 @@ export function requestFields(request: Request): Pick<LogFields, 'route' | 'meth
   let route = 'unparseable';
   try { route = new URL(request.url).pathname.slice(0, 120); } catch { /* Keep the placeholder. */ }
   return { route, method: request.method, requestId: request.headers.get('cf-ray') };
+}
+
+const D1_MESSAGE_LIMIT = 300;
+
+/**
+ * The text of a D1 error, which names a SQLite problem and no bound value, so a
+ * failed statement shows why in the log. Every statement is static, so the text
+ * carries no user input. Another error gets no text, because its message can.
+ */
+export function d1ErrorFields(error: unknown): Pick<LogFields, 'errorMessage'> {
+  return error instanceof Error && error.message.startsWith('D1_ERROR: ')
+    ? { errorMessage: error.message.slice(0, D1_MESSAGE_LIMIT) }
+    : {};
 }
 
 export function logEvent(level: LogLevel, event: string, fields: LogFields = {}): void {

@@ -272,7 +272,7 @@ async function measureShape(name, shape) {
       const current = await raw.prepare('SELECT id FROM logins WHERE account_id = ? ORDER BY rowid DESC LIMIT 1').bind(login.account).first();
       const caller = { accountId: login.account, loginId: current.id };
       const result = await raw.prepare(lib.snapshotSql).bind(caller.accountId, caller.loginId,
-        ...lib.contestDataBindings(caller, session), ...Array(9).fill(session)).all();
+        ...lib.contestDataBindings(caller, session), ...Array(7).fill(session)).all();
       return result.meta.rows_read;
     };
     const undelivered = async () => (await raw.prepare('SELECT count(*) AS n FROM notifications WHERE delivered = 0').first()).n;

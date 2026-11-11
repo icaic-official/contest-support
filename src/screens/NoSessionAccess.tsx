@@ -135,12 +135,15 @@ export function NoSessionAccess({
               <Skeleton className="h-4 w-1/2" />
             </CardContent>
           </Card>
-        ) : refreshError || error ? (
-          access
         ) : (
-          // Mounted only once a read finished without a contest, so the
-          // ordinary first load of every account makes no site read.
-          <WebmasterAccess data={data} fallback={access} />
+          // Mounted only once a read finished, so the ordinary first load of
+          // every account makes no site read. A failed read mounts it too, so
+          // a webmaster keeps the way to the site page.
+          <WebmasterAccess
+            data={data}
+            fallback={access}
+            failed={Boolean(refreshError || error)}
+          />
         )}
       </div>
       <p className="px-4 py-2 text-center text-xs text-muted-foreground">

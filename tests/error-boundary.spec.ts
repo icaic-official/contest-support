@@ -30,17 +30,26 @@ async function signIn(page: Page, api: FakeWorker) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
-/** Makes the next render of the organiser UI throw, as a failed render does. */
+/**
+ * Runs in the browser. Makes the organiser UI throw when it renders, as a
+ * failed render does. A device that remembers its last screen reads the same
+ * media query before the workspace renders, and then the crash reaches the
+ * boundary around the whole app. `forgetScreen` keeps it in the workspace.
+ */
+function forceRenderError(forgetScreen: boolean) {
+  if (forgetScreen) window.localStorage.removeItem("minsky-screen");
+  const original = window.matchMedia.bind(window);
+  window.matchMedia = (query) => {
+    if (query.includes("min-width: 1024px")) {
+      throw new Error("Forced render error.");
+    }
+    return original(query);
+  };
+}
+
+/** Makes the next render of the organiser UI throw. */
 async function breakNextRender(page: Page) {
-  await page.evaluate(() => {
-    const original = window.matchMedia.bind(window);
-    window.matchMedia = (query) => {
-      if (query.includes("min-width: 1024px")) {
-        throw new Error("Forced render error.");
-      }
-      return original(query);
-    };
-  });
+  await page.evaluate(forceRenderError, false);
   // A narrower window changes the media query, so the UI renders again.
   await page.setViewportSize({ width: 600, height: 800 });
 }
@@ -66,4 +75,29 @@ test("a render error shows a recovery screen, and Reload restores the page", asy
   await recovery.getByRole("button", { name: "Reload" }).click();
   await expect(recovery).toBeHidden();
   await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+});
+
+test("a render error that repeats on every load still lets the person sign out", async ({
+  page,
+  api,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page, api);
+  await expect(page.locator('[data-ui="organiser-desktop"]')).toBeVisible();
+  await page.addInitScript(forceRenderError, true);
+  await page.reload();
+  const recovery = page.getByRole("alert").filter({
+    has: page.getByRole("heading", { name: "Something went wrong" }),
+  });
+  await expect(recovery).toBeVisible({ timeout: 15_000 });
+  await Promise.all([
+    page.waitForEvent("load"),
+    recovery.getByRole("button", { name: "Reload" }).click(),
+  ]);
+  await expect(recovery).toBeVisible({ timeout: 15_000 });
+  await recovery.getByRole("button", { name: "Sign out" }).click();
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  await expect(recovery).toBeHidden();
 });

@@ -26,7 +26,7 @@ Use these interfaces and components:
 | [`Backend`](../src/backend/contracts.ts) | Supply all eight groups: `auth`, `workflows`, `manage`, `contestAwards`, `images`, `announcements`, `avatars`, and `updates`. Preserve their types and error meanings. |
 | [`Command` and `snapshotSchema`](../src/connected/model.ts) | Reuse the existing commands, roles, and validated snapshot structure. The jury worklist consumes this same snapshot. |
 | [`capabilityRule`](../src/connected/capabilities.ts) | Reuse the one table of what a seat may do. Workflow decisions and the browser's page gates read it. |
-| [`WorkflowPersistence`](../src/server/workflow.ts) | Implement `read()` and `commit()` for `WorkflowService`. Keep database queries and transaction controls inside the adapter. |
+| [`WorkflowPersistence`](../src/server/workflow.ts) | Implement `read()` and `commit()` for `WorkflowService`. Keep database queries and transaction controls inside the adapter. When `commit()` returns `unknown`, pass the error to its `onUnknown` argument first, so the Worker can log the cause. |
 | [`Caller`](../src/server/authentication.ts) | Derive `accountId` and `loginId` from trusted authentication. Never accept a caller identity from a request body. |
 | [`AuthenticationService`](../src/server/authentication.ts) | Implement `current`, `signIn`, `signOut`, and `changePassword` if you reuse `createAuthenticationHandler()`. |
 | [`createAuthenticationHandler()`](../src/server/authenticationHttp.ts) | Reuse the existing same-origin authentication routes when your protocol matches. It checks bounded JSON, origins, request protection, and typed errors. |

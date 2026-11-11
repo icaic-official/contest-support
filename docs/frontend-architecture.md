@@ -82,6 +82,7 @@ That screen shows a loading state, refresh errors, a **Refresh access** button a
 After a failed connection it shows the error "Minsky could not reach the server. Check your connection and try again." Without a refresh error it asks the person to contact an organizer.
 **Refresh access** stays disabled while its read runs.
 For a webmaster, `WebmasterAccess` (`src/site/WebmasterAccess.tsx`) also lists the contests to join when the site restricts webmaster reads, and it links to the site dashboard.
+For an event admin, it links to the event console when a listed contest has the level `event`. The contest list loads before the snapshot, so the link shows even when the snapshot read fails.
 
 After a UI is selected, `Workspace` keeps that UI mounted when the snapshot disappears.
 A refresh error or a session change can remove the snapshot. The shell then shows `NoSessionAccess` itself.
@@ -462,7 +463,7 @@ To give a team its record, copy `contestant-visible/`, then delete the other tea
 | --- | --- |
 | `useSite.ts` | The site read, the commands and `joinContest`. |
 | `SiteLink.tsx` | The link to the page. Only a webmaster sees it. |
-| `WebmasterAccess.tsx` | What a webmaster sees on `NoSessionAccess`. |
+| `WebmasterAccess.tsx` | What a webmaster or an event admin sees on `NoSessionAccess`. |
 | `JoinContests.tsx` | The contests that the webmaster has not joined. |
 
 The last webmaster cannot be removed. The server enforces this rule.
@@ -567,20 +568,21 @@ These rules apply:
 A render error unmounts the React tree above it. Without a boundary, the page goes blank.
 `RenderErrorBoundary` (`src/components/render-error-boundary.tsx`) catches the error and shows a recovery card.
 The card says what happened, says that sent work is saved on the server and that unsent text may be lost, and has a **Reload** button.
-It uses no router, provider, or backend state, so it still works when those fail.
+A boundary that gets an `onSignOut` callback also shows **Sign out**. Without it, a crash that repeats on every load leaves a signed-in person no way to leave.
+The card uses no router, provider, or backend state, so it still works when those fail.
 
 The app has three boundaries:
 
 | Boundary | Where | What stays usable |
 | --- | --- | --- |
 | `app` | `src/main.tsx`, around the router | Nothing. This is the last resort. It shows the brand header and the card. |
-| `region` | `Workspace`, around the contestant or organizer UI | The announcement banner and the build ID. |
+| `region` | `Workspace`, around the contestant or organizer UI. It sets `onSignOut`, because its card replaces the top bar and the account menu. | The announcement banner and the build ID. |
 | `region` | The desktop console, around the page body | The sidebar and the top bar. |
 
 A region boundary clears its failure when its `resetKey` changes. The `Workspace` boundary uses the path. The console boundary uses the page. A person can leave a failed page without a reload.
 The event console and the site dashboard have no region boundary. An error there reaches the `app` boundary.
 The boundary writes the error and the component stack to the console. It sends nothing to the server.
-`tests/error-boundary.spec.ts` forces a render error and checks the card and **Reload**.
+`tests/error-boundary.spec.ts` forces a render error and checks the card and **Reload**. It also forces an error that repeats on every load and checks **Sign out**.
 
 ## Root elements
 

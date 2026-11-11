@@ -14,8 +14,11 @@ export interface LogFields {
   readonly task?: string;
   /** The event of a deletion that failed. An operator can read it, and it names no person. */
   readonly eventId?: string;
-  /** The part of a deletion that failed. */
-  readonly phase?: 'contests' | 'accounts' | 'event' | 'live' | 'files' | 'unknown';
+  /**
+   * The part of a deletion that failed, or the step of a workflow command that
+   * ended with an unknown outcome. `retries` means that every attempt asked for another.
+   */
+  readonly phase?: 'contests' | 'accounts' | 'event' | 'live' | 'files' | 'unknown' | 'read' | 'commit' | 'retries';
   /** What the error of a failed deletion says, as a fixed word and never as its text. */
   readonly cause?: 'foreign_key' | 'internal' | 'other';
   readonly delivered?: number;

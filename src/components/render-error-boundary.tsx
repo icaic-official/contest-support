@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { RotateCw } from "lucide-react";
+import { LogOut, RotateCw } from "lucide-react";
 import { BrandMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,12 @@ interface Props {
   scope: "app" | "region";
   /** The boundary shows its children again when this value changes. */
   resetKey?: string | undefined;
+  /**
+   * Adds a Sign out button to the recovery screen. Pass it only where a person
+   * is signed in. A crash that repeats on every load leaves nothing else to
+   * select.
+   */
+  onSignOut?: (() => void) | undefined;
   children: ReactNode;
 }
 
@@ -53,11 +59,22 @@ export class RenderErrorBoundary extends Component<Props, State> {
 
   override render(): ReactNode {
     if (!this.state.failed) return this.props.children;
-    return <RecoveryScreen scope={this.props.scope} />;
+    return (
+      <RecoveryScreen
+        scope={this.props.scope}
+        onSignOut={this.props.onSignOut}
+      />
+    );
   }
 }
 
-function RecoveryScreen({ scope }: { scope: Props["scope"] }) {
+function RecoveryScreen({
+  scope,
+  onSignOut,
+}: {
+  scope: Props["scope"];
+  onSignOut: Props["onSignOut"];
+}) {
   const card = (
     <Card className="w-full max-w-md" role="alert">
       <CardHeader>
@@ -76,6 +93,12 @@ function RecoveryScreen({ scope }: { scope: Props["scope"] }) {
           <RotateCw aria-hidden="true" />
           Reload
         </Button>
+        {onSignOut && (
+          <Button variant="outline" className="h-11" onClick={onSignOut}>
+            <LogOut aria-hidden="true" />
+            Sign out
+          </Button>
+        )}
         <p className="text-sm text-muted-foreground">
           If this keeps happening, tell a volunteer or the organizer.
         </p>

@@ -101,7 +101,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
   }
 
   async commit(caller: Caller, sessionId: string, requestId: string, command: Command,
-    read: WorkflowRead, decision: WorkflowDecision): Promise<WorkflowCommitResult> {
+    read: WorkflowRead, decision: WorkflowDecision, onUnknown?: (error: unknown) => void): Promise<WorkflowCommitResult> {
     const assertionId = crypto.randomUUID();
     const parameters = this.parameters(caller, sessionId, requestId, command);
     const assertion = (suffix: string, condition: string, ...values: D1Value[]) =>
@@ -121,7 +121,7 @@ export class D1ApplicationStore implements WorkflowPersistence {
         ]);
         return { outcome: 'committed', issueId: read.receipt.issueId };
       } catch (error) {
-        return this.rollbackResult(error);
+        return this.rollbackResult(error, onUnknown);
       }
     }
     if (typeof read.dependency !== 'string' || decision.type !== command.type ||
@@ -229,16 +229,19 @@ export class D1ApplicationStore implements WorkflowPersistence {
       await this.db.batch(statements);
       return { outcome: 'committed', issueId };
     } catch (error) {
-      return this.rollbackResult(error);
+      return this.rollbackResult(error, onUnknown);
     }
   }
 
-  private rollbackResult(error: unknown): WorkflowCommitResult {
+  private rollbackResult(error: unknown, onUnknown: ((error: unknown) => void) | undefined): WorkflowCommitResult {
     const message = error instanceof Error ? error.message : '';
     // Only a known atomic rollback permits reevaluation. Network failures can
     // hide a successful commit; callers must retain the same request ID.
-    return message.includes('CHECK constraint failed: valid = 1') ||
-      message.includes('UNIQUE constraint failed: command_receipts.actor, command_receipts.request_id')
-      ? { outcome: 'retry' } : { outcome: 'unknown' };
+    if (message.includes('CHECK constraint failed: valid = 1') ||
+      message.includes('UNIQUE constraint failed: command_receipts.actor, command_receipts.request_id')) {
+      return { outcome: 'retry' };
+    }
+    onUnknown?.(error);
+    return { outcome: 'unknown' };
   }
 }

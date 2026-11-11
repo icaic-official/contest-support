@@ -74,7 +74,7 @@ describe('Cloudflare application HTTP boundary', () => {
     const command = { type: 'submit', category: 'Other', description: 'Fictional report' };
     const response = await handle(post('/api/workflow', { sessionId, requestId, command }));
     expect(response.status).toBe(200);
-    expect(deps.workflow.execute).toHaveBeenCalledWith(identity.caller, sessionId, requestId, command);
+    expect(deps.workflow.execute).toHaveBeenCalledWith(identity.caller, sessionId, requestId, command, expect.any(Function));
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     const forged = await handle(post('/api/workflow', { sessionId, requestId, command, caller: { accountId: requestId } }));
     expect(await forged.json()).toEqual({ outcome: 'rejected', reason: 'input' });
@@ -217,11 +217,67 @@ describe('Cloudflare application HTTP boundary', () => {
     const lines = logged.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown);
     logged.mockRestore();
     expect(response.status).toBe(503);
-    expect(await response.text()).not.toContain('VIEWs');
+    expect(await response.json()).toEqual({ error: 'Minsky could not load this. Try again in a moment.', requestId: 'ray-1' });
     expect(lines).toEqual([{
       level: 'error', event: 'http.unhandled_error', route: '/api/snapshot', method: 'GET', requestId: 'ray-1',
       status: 503, errorName: 'Error', errorMessage: engine,
     }]);
+  });
+
+  it('logs the phase and engine text of a failed workflow, and shows the client nothing of it', async () => {
+    const deps = services();
+    const engine = 'D1_ERROR: VIEWs and/or subqueries nested too deep: SQLITE_ERROR';
+    deps.workflow.execute.mockImplementation(async (_caller, _session, _request, _command, onFailure) => {
+      onFailure?.('read', new Error(engine));
+      return { outcome: 'unknown' };
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const response = await createApplicationHandler(deps, origin)(post('/api/workflow',
+      { sessionId, requestId, command: {} }, { Cookie: 'session=fictional-cookie', 'cf-ray': 'ray-2' }));
+    const lines = logged.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown);
+    logged.mockRestore();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ outcome: 'unknown', requestId: 'ray-2' });
+    expect(lines).toEqual([{
+      level: 'error', event: 'workflow.failed', route: '/api/workflow', method: 'POST', requestId: 'ray-2',
+      status: 503, phase: 'read', errorName: 'Error', errorMessage: engine,
+    }]);
+  });
+
+  describe('503 body', () => {
+    const quiet = () => vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    it('says that a failed write may have an unknown outcome, and carries the request ID', async () => {
+      const deps = services();
+      deps.manage.execute.mockRejectedValueOnce(new Error('D1_ERROR: Private SQL bound values.'));
+      const logged = quiet();
+      const response = await createApplicationHandler(deps, origin)(post('/api/manage',
+        { requestId, command: { type: 'set_intake', contestId: sessionId, mode: 'open' } }, { 'cf-ray': 'ray-3' }));
+      logged.mockRestore();
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: 'The request could not be completed. Its write outcome may be unknown.', requestId: 'ray-3' });
+    });
+
+    it('leaves the request ID out when the request has none', async () => {
+      const deps = services();
+      deps.application.contests.mockRejectedValueOnce(new Error('D1_ERROR: Private SQL bound values.'));
+      const logged = quiet();
+      const response = await createApplicationHandler(deps, origin)(
+        new Request(`${origin}/api/contests`, { headers: { Origin: origin } }));
+      logged.mockRestore();
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'Minsky could not load this. Try again in a moment.' });
+    });
+
+    it('carries the request ID on an unknown workflow outcome', async () => {
+      const deps = services();
+      deps.workflow.execute.mockResolvedValueOnce({ outcome: 'unknown' });
+      const response = await createApplicationHandler(deps, origin)(post('/api/workflow',
+        { sessionId, requestId, command: {} }, { 'cf-ray': 'ray-4' }));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ outcome: 'unknown', requestId: 'ray-4' });
+    });
   });
 
   describe('workflow response snapshot', () => {

@@ -49,10 +49,22 @@ export interface WorkflowRead {
 export type WorkflowCommitResult = CommandResult | { outcome: 'retry' };
 export interface WorkflowPersistence {
   read(caller: Caller, sessionId: string, requestId: string, command: Command): Promise<WorkflowRead | undefined>;
-  /** Recheck current access and dependencies. Commit all effects together or none. */
+  /**
+   * Recheck current access and dependencies. Commit all effects together or none.
+   * When a failure leaves the outcome unknown, pass its error to `onUnknown`
+   * before the `unknown` result, because that result carries no cause.
+   */
   commit(caller: Caller, sessionId: string, requestId: string, command: Command,
-    read: WorkflowRead, decision: WorkflowDecision): Promise<WorkflowCommitResult>;
+    read: WorkflowRead, decision: WorkflowDecision,
+    onUnknown?: (error: unknown) => void): Promise<WorkflowCommitResult>;
 }
+
+/**
+ * Where a command ended with an unknown outcome. `read` wrote nothing in this
+ * attempt. `commit` may have written. `retries` means that every attempt asked
+ * for another one.
+ */
+export type WorkflowFailurePhase = 'read' | 'commit' | 'retries';
 
 type Rejection = Extract<CommandResult, { outcome: 'rejected' }>;
 const reject = (reason: Rejection['reason']): Rejection => ({ outcome: 'rejected', reason });
@@ -200,9 +212,20 @@ export function decideWorkflow(state: WorkflowState, command: Command): Workflow
 export class WorkflowService {
   constructor(private readonly store: WorkflowPersistence) {}
 
-  async execute(caller: Caller, sessionId: string, requestId: string, input: unknown): Promise<CommandResult> {
+  /**
+   * An unknown result carries no cause. `onFailure` gets the phase and the
+   * error, so the caller can log them without the service knowing how.
+   */
+  async execute(caller: Caller, sessionId: string, requestId: string, input: unknown,
+    onFailure?: (phase: WorkflowFailurePhase, error?: unknown) => void): Promise<CommandResult> {
     if (!uuidPattern.test(sessionId) || !uuidPattern.test(requestId) || !isWorkflowCommand(input)) return reject('input');
     for (let attempt = 0; attempt < 3; attempt++) {
+      let phase: 'read' | 'commit' = 'read';
+      const commit = (read: WorkflowRead, decision: WorkflowDecision) => {
+        phase = 'commit';
+        return this.store.commit(caller, sessionId, requestId, input, read, decision,
+          (error) => onFailure?.('commit', error));
+      };
       try {
         const read = await this.store.read(caller, sessionId, requestId, input);
         if (!read || read.state.archived) return reject('access');
@@ -210,7 +233,7 @@ export class WorkflowService {
         // certify a replay across a concurrent permission change.
         if (read.receipt) {
           if (read.receipt.sessionId !== sessionId || !equalWorkflowJson(read.receipt.command, input)) return reject('request_id');
-          const replay = await this.store.commit(caller, sessionId, requestId, input, read, {
+          const replay = await commit(read, {
             type: input.type, issueId: read.receipt.issueId, teamId: '', history: { text: '', visibility: 'public' },
           });
           if (replay.outcome !== 'retry') return replay;
@@ -218,13 +241,15 @@ export class WorkflowService {
         }
         const decision = decideWorkflow(read.state, input);
         if ('outcome' in decision) return decision;
-        const result = await this.store.commit(caller, sessionId, requestId, input, read, decision);
+        const result = await commit(read, decision);
         if (result.outcome !== 'retry') return result;
-      } catch {
+      } catch (error) {
         // A transport failure can occur after commit. Only retry the same request ID.
+        onFailure?.(phase, error);
         return { outcome: 'unknown' };
       }
     }
+    onFailure?.('retries');
     return { outcome: 'unknown' };
   }
 }

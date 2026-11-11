@@ -68,6 +68,9 @@ The service distinguishes committed, rejected, and unknown results. A rejection 
 Only a known rolled-back conflict permits internal reevaluation, with at most three attempts.
 Unexpected database errors, transport loss, and unreadable success responses preserve an unknown outcome.
 The browser retains the original request ID and command for a retry.
+The service does not tell the browser where a command failed. A failed read wrote nothing in that attempt. But the service cannot tell a first send from a retry of an earlier send whose response was lost. So every failure keeps the unknown outcome.
+`execute()` takes an optional last argument. The service passes it the phase and the error of each unknown result. The phase is `read`, `commit`, or `retries`.
+The HTTP handler logs them as `workflow.failed`. The service never logs.
 
 Public activity advances the issue revision and the affected team's notification counter.
 Internal notes advance only the private version and the staff notification counter.

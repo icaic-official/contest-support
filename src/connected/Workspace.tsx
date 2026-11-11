@@ -129,7 +129,11 @@ export function Workspace({
         <Announcements key={data.sessionId} data={data} />
         {/* A crash in one UI keeps the announcements and build id visible. */}
         <div className="min-h-0 flex-1">
-          <RenderErrorBoundary scope="region" resetKey={pathname}>
+          <RenderErrorBoundary
+            scope="region"
+            resetKey={pathname}
+            onSignOut={props.signOut}
+          >
             <WithScreen>{app}</WithScreen>
           </RenderErrorBoundary>
         </div>

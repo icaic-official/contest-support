@@ -322,6 +322,13 @@ describe('Cloudflare Backend transport', () => {
       }
     });
 
+    it('adds the request reference to an unknown outcome', async () => {
+      const backend = createCloudflareBackend({ origin, fetch: transport(() =>
+        Response.json({ error: 'The request could not be completed.', requestId: 'ray-5' }, { status: 503 })) });
+      await expect(backend.announcements.execute(sessionId, requestId, publish))
+        .rejects.toThrow('Announcement outcome is unknown. Retry the same request. Reference: ray-5.');
+    });
+
     it('reserves, transfers with a SHA-256 digest, then finishes an image', async () => {
       const calls: Array<{ method: string; path: string; headers: Headers; body?: BodyInit | null | undefined }> = [];
       const fetcher = vi.fn<typeof fetch>(async (input, init) => {

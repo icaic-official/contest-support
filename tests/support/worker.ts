@@ -1,8 +1,8 @@
 import { test as base, expect, type BrowserContext, type Page, type WebSocketRoute } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import type {
-  CredentialIssue, EventCode, EventConsole, IssuedCredential, ManageCommand, ManageReceipt, PersonAvatar, SignInTarget,
-  SiteOverview,
+  ContestSummary, CredentialIssue, EventCode, EventConsole, IssuedCredential, ManageCommand, ManageReceipt, PersonAvatar,
+  SignInTarget, SiteOverview,
 } from '../../src/backend/contracts';
 import type { AnnouncementSnapshot } from '../../src/connected/announcementModel';
 import type { Command, Membership, Snapshot } from '../../src/connected/model';
@@ -297,6 +297,9 @@ export class FakeWorker extends FixtureWorker {
   /** The site that the signed-in account reads. Null is a person who is not a webmaster. */
   site: SiteOverview | null = null;
 
+  /** The `manage` level that the contest list gives to every contest of the signed-in account. */
+  contestLevel: ContestSummary['manage'] = 'none';
+
   /** Receives each credential request. Throw an AuthenticationError to reject. */
   issue: (input: CredentialIssue) => Promise<IssuedCredential[]> = async () => {
     throw new AuthenticationError(403, 'Only a webmaster can issue webmaster passwords.');
@@ -324,7 +327,7 @@ export class FakeWorker extends FixtureWorker {
           id: item.session!.id, name: item.session!.name, eventId: item.event?.id ?? '', eventName: item.event?.name ?? '',
           timeZone: 'UTC', contestType: 'teams' as const, schedule: null,
           intake: { open: item.session!.intake_open, reason: item.session!.intake_open ? 'override_open' as const : 'override_closed' as const, changesAt: null },
-          canOpen: true, manage: 'none' as const,
+          canOpen: true, manage: this.contestLevel,
         })),
       snapshot: async (_caller, sessionId) => this.read(sessionId),
     },

@@ -45,6 +45,7 @@ test('a lost session read blames the connection, not the account', async ({ page
   await expect(page.getByText('Minsky could not load your session.'))
     .toBeVisible();
   await expect(page.getByText(/ask an organizer to assign your membership/)).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Open the event console', exact: true })).toHaveCount(0);
 });
 
 const site: SiteOverview = {
@@ -58,6 +59,17 @@ test('a webmaster keeps the way to the site page and Sign out when the session r
   await expect(page.getByText('Minsky could not load your session.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open the site page', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+});
+
+test('an event admin keeps the way to the event console and Sign out when the session read fails', async ({ page, api }) => {
+  api.contestLevel = 'event';
+  await page.route(snapshotRequest, (route) => route.abort('failed'));
+  await signInWithoutSnapshot(page, api);
+  await expect(page.getByText('Minsky could not load your session.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open the site page', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Open the event console', exact: true }).click();
+  await expect(page).toHaveURL(/\/event$/);
 });
 
 test('a webmaster whose site restricts reads still sees why the session read failed', async ({ page, api }) => {

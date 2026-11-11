@@ -181,6 +181,31 @@ describe('Cloudflare Backend transport', () => {
     }
   });
 
+  describe('request reference on a 503', () => {
+    const readFailure = (body: unknown) => createCloudflareBackend({
+      origin, fetch: transport(() => Response.json(body, { status: 503 })) }).workflows.snapshot(sessionId);
+    const load = 'Minsky could not load this. Try again in a moment.';
+
+    it('adds the reference to the text of a failed read', async () => {
+      await expect(readFailure({ error: load, requestId: 'ray-1' })).rejects.toThrow(`${load} Reference: ray-1.`);
+      await expect(readFailure({ error: load })).rejects.toThrow(new Error(load));
+    });
+
+    it('adds the reference to an unknown workflow outcome, and keeps it unknown', async () => {
+      const backend = createCloudflareBackend({ origin, fetch: transport(() =>
+        Response.json({ outcome: 'unknown', requestId: 'ray-4' }, { status: 503 })) });
+      const failure = backend.workflows.execute(sessionId, requestId, command);
+      await expect(failure).rejects.toThrow('Workflow outcome is unknown. Retry the same request. Reference: ray-4.');
+      await expect(failure).rejects.not.toBeInstanceOf(WorkflowRejectedError);
+    });
+
+    it('shows no reference that is not a short plain token', async () => {
+      for (const unsafe of ['x'.repeat(41), 'ray 1 <b>', '']) {
+        await expect(readFailure({ error: load, requestId: unsafe })).rejects.toThrow(new Error(load));
+      }
+    });
+  });
+
   it('marks a management command refused only when the server answered with a 4xx', async () => {
     const send = (response: () => Response) => createCloudflareBackend({ origin, fetch: transport(response) })
       .manage.execute(requestId, { type: 'set_intake', contestId: sessionId, mode: 'open' });

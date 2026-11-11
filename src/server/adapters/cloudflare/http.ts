@@ -12,7 +12,7 @@ import type { R2AvatarService } from './avatars';
 import type { D1ContestAwardService } from './contestAwards';
 import type { D1ContestRecordService } from './contestRecord';
 import type { D1ManageService } from './manage';
-import { logEvent, requestFields } from './log';
+import { d1ErrorFields, logEvent, requestFields } from './log';
 import { baseSecurityHeaders } from './securityHeaders';
 
 const uuid = z.uuid();
@@ -227,7 +227,7 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (error instanceof ImageRequestError) return privateJson({ error: error.message,
         validation: error.validation, restart: error.restart, incomplete: error.incomplete }, 409);
       if (error instanceof z.ZodError || error instanceof URIError) return privateJson({ error: 'The request is invalid.' }, 400);
-      logEvent('error', 'http.unhandled_error', { ...requestFields(request), status: 503, error });
+      logEvent('error', 'http.unhandled_error', { ...requestFields(request), status: 503, error, ...d1ErrorFields(error) });
       return privateJson({ error: 'The request could not be completed. Its write outcome may be unknown.' }, 503);
     }
   };

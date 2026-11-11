@@ -207,6 +207,23 @@ describe('Cloudflare application HTTP boundary', () => {
     expect(await (await handle(post('/api/workflow', body))).text()).not.toContain('Private SQL');
   });
 
+  it('logs the engine text of a failed D1 read, and shows the client nothing of it', async () => {
+    const deps = services();
+    const engine = 'D1_ERROR: VIEWs and/or subqueries nested too deep: SQLITE_ERROR';
+    deps.application.snapshot.mockRejectedValue(new Error(engine));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const response = await createApplicationHandler(deps, origin)(new Request(`${origin}/api/snapshot?sessionId=${sessionId}`, {
+      headers: { Origin: origin, Cookie: 'session=fictional-cookie', 'cf-ray': 'ray-1' } }));
+    const lines = logged.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown);
+    logged.mockRestore();
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain('VIEWs');
+    expect(lines).toEqual([{
+      level: 'error', event: 'http.unhandled_error', route: '/api/snapshot', method: 'GET', requestId: 'ray-1',
+      status: 503, errorName: 'Error', errorMessage: engine,
+    }]);
+  });
+
   describe('workflow response snapshot', () => {
     const snapshot: Snapshot = {
       session: null, event: null, membership: null, teams: [], issues: [], resolutions: [], history: [], attachments: [],

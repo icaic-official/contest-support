@@ -168,14 +168,15 @@ export function createCloudflareBackend(options: {
     },
     async execute(sessionId, requestId, command) {
       const response = await post('/api/announcements', { sessionId, requestId, command });
-      const result = announcementResultSchema.safeParse(await response.json().catch(() => undefined));
+      const body: unknown = await response.json().catch(() => undefined);
+      const result = announcementResultSchema.safeParse(body);
       // Only the endpoint's typed rejection confirms that no command committed.
       if (result.success && result.data.outcome === 'rejected') {
         throw new AnnouncementRejectedError(result.data.error ?? 'Check the announcement and try again.',
           result.data.reason === 'conflict');
       }
       if (!response.ok || !result.success || result.data.outcome !== 'committed') {
-        throw new Error('Announcement outcome is unknown. Retry the same request.');
+        throw new Error(withReference('Announcement outcome is unknown. Retry the same request.', body));
       }
       return result.data.id;
     },

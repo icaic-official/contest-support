@@ -80,7 +80,7 @@ The server leaves out what the caller cannot read:
 
 `WorkflowRejectedError` confirms that the server rejected the command. The UI can clear the pending request and accept a new command.
 Other failures leave the write outcome unknown, including an invalid success response. The UI keeps the request ID and the command for **Retry last request**.
-A 503 body can carry `requestId`, the `cf-ray` value that the Worker logs. The client adds it to the error text as "Reference: ...", so a person can quote it. This holds for the unknown outcome of a workflow command too.
+A 503 body can carry `requestId`, the `cf-ray` value that the Worker logs. The client adds it to the error text as "Reference: ...", so a person can quote it. This holds for the unknown outcome of a workflow command or an announcement too.
 
 ## Management
 

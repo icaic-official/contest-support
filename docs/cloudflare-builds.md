@@ -234,6 +234,7 @@ To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
 | --- | --- |
 | `worker.unhandled_error` | A request to `/api` failed. The client got a 503. |
 | `http.unhandled_error` | An application route failed. The client got a 503. When D1 refused a statement, `errorMessage` holds the first 300 characters of the D1 text, such as `D1_ERROR: ...: SQLITE_ERROR`. |
+| `workflow.failed` | A workflow command ended with an unknown outcome. The client got a 503. The `phase` field says where. `read` means this attempt wrote nothing. `commit` means the write may have happened. `retries` means every attempt asked for another one, and the line has no error fields. When D1 refused a statement, `errorMessage` holds the D1 text. |
 | `authentication.unhandled_error` | Sign-in or account handling failed. The client got a 503. |
 | `live.coordinator_error` | The live-update Durable Object failed a request. |
 | `live.alarm_error` | The Durable Object alarm failed. |
@@ -242,10 +243,10 @@ To watch live from a terminal, run `npx wrangler tail minsky-dev --format json`.
 | `scheduled.task_failed` | One task of the every-minute cron job failed. The `task` field names it. This includes the image, announcement image, and avatar recovery steps. |
 | `scheduled.failed` | The cron job had at least one failed task. |
 
-Each event has `level` and `event`. It can also have `route`, `method`, `requestId`, `status`, `task`, counts, `errorName`, and `errorCode`.
+Each event has `level` and `event`. It can also have `route`, `method`, `requestId`, `status`, `task`, `phase`, counts, `errorName`, and `errorCode`.
 `requestId` is the `cf-ray` value of the request.
 The logs never contain passwords, cookies, tokens, IP addresses, request bodies, image data, message text, or error messages.
-The one exception is `errorMessage` on `http.unhandled_error`, and only for a D1 error. It names a SQLite problem and never a bound value.
+The one exception is `errorMessage` on `http.unhandled_error` and `workflow.failed`, and only for a D1 error. It names a SQLite problem and never a bound value.
 A migration failure is not a Worker log. It appears in the Workers Builds log of the failed build.
 
 ### Change the D1 schema

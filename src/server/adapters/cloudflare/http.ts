@@ -162,7 +162,8 @@ export function createApplicationHandler(services: ApplicationHttpServices, orig
       if (url.pathname === '/api/workflow') {
         const parsed = workflowSchema.safeParse(body);
         if (!parsed.success) return privateJson({ outcome: 'rejected', reason: 'input' }, 400);
-        const result = await services.workflow.execute(caller, parsed.data.sessionId, parsed.data.requestId, parsed.data.command);
+        const result = await services.workflow.execute(caller, parsed.data.sessionId, parsed.data.requestId, parsed.data.command,
+          (phase, error) => logEvent('error', 'workflow.failed', { ...requestFields(request), status: 503, phase, error, ...d1ErrorFields(error) }));
         if (result.outcome !== 'committed') return privateJson(result, result.outcome === 'rejected' ? 409 : 503);
         // The commit is final. A failed read must not turn it into an error, so the client reads again.
         let snapshot: Awaited<ReturnType<ApplicationHttpServices['application']['snapshot']>> | undefined;

@@ -142,6 +142,16 @@ describe("D1 workflow persistence", () => {
     expect(await fixture.durableState()).toEqual(before);
   });
 
+  it("reports the engine error of a failed batch to the caller, and the outcome stays unknown", async () => {
+    const failure = new Error("D1_ERROR: Network connection lost");
+    workflow = workflowService({ prepare: (sql) => db.prepare(sql), batch: async () => { throw failure; } });
+    const failures: unknown[][] = [];
+    const result = await workflow.execute(fixture.staff, fixture.sessionId, randomUUID(), claim(),
+      (...failed: unknown[]) => { failures.push(failed); });
+    expect(result).toEqual({ outcome: "unknown" });
+    expect(failures).toEqual([["commit", failure]]);
+  });
+
   it("preserves an unknown outcome after committed response loss and safely retries", async () => {
     let lost = false;
     workflow = workflowService({

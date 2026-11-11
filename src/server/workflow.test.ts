@@ -125,3 +125,67 @@ describe('shared workflow compatibility edges', () => {
       .toEqual({ outcome: 'rejected', reason: 'state' });
   });
 });
+
+describe('workflow failure reports', () => {
+  const caller: Caller = { accountId: 'person', loginId: 'login-person' };
+  const sessionId = '00000000-0000-4000-8000-0000000000b1';
+  const requestId = '00000000-0000-4000-8000-0000000000a1';
+  const claim = { type: 'claim' as const, issue_id: issueId, revision: 0 };
+  const read = {
+    state: { ...state, issue: { ...state.issue!, status: 'open' as const, owner: null } },
+    dependency: 'captured', receipt: null,
+  };
+  const engine = new Error('D1_ERROR: nested too deep: SQLITE_ERROR');
+  type Commit = WorkflowPersistence['commit'];
+
+  function run(store: WorkflowPersistence) {
+    const failures: unknown[][] = [];
+    const result = new WorkflowService(store).execute(caller, sessionId, requestId, claim,
+      (...failure: unknown[]) => { failures.push(failure); });
+    return { result, failures };
+  }
+
+  it('reports a failed read, which wrote nothing, and still answers unknown', async () => {
+    const store = { read: vi.fn().mockRejectedValue(engine), commit: vi.fn() } satisfies WorkflowPersistence;
+    const { result, failures } = run(store);
+    expect(await result).toEqual({ outcome: 'unknown' });
+    expect(failures).toEqual([['read', engine]]);
+    expect(store.commit).not.toHaveBeenCalled();
+  });
+
+  it('reports a commit that throws, and still answers unknown', async () => {
+    const store = { read: vi.fn().mockResolvedValue(read), commit: vi.fn().mockRejectedValue(engine) } satisfies WorkflowPersistence;
+    const { result, failures } = run(store);
+    expect(await result).toEqual({ outcome: 'unknown' });
+    expect(failures).toEqual([['commit', engine]]);
+  });
+
+  it('reports the error that the store hides behind its own unknown result', async () => {
+    const commit = vi.fn<Commit>(async (...args) => { args[6]?.(engine); return { outcome: 'unknown' }; });
+    const { result, failures } = run({ read: vi.fn().mockResolvedValue(read), commit });
+    expect(await result).toEqual({ outcome: 'unknown' });
+    expect(failures).toEqual([['commit', engine]]);
+  });
+
+  it('reports retries that never end, with no error', async () => {
+    const commit = vi.fn<Commit>().mockResolvedValue({ outcome: 'retry' });
+    const { result, failures } = run({ read: vi.fn().mockResolvedValue(read), commit });
+    expect(await result).toEqual({ outcome: 'unknown' });
+    expect(commit).toHaveBeenCalledTimes(3);
+    expect(failures).toEqual([['retries']]);
+  });
+
+  it('reports nothing for a commit, a rejection, or a retry that then commits', async () => {
+    const committed = { outcome: 'committed' as const, issueId };
+    const commit = vi.fn<Commit>().mockResolvedValueOnce({ outcome: 'retry' }).mockResolvedValue(committed);
+    const first = run({ read: vi.fn().mockResolvedValue(read), commit });
+    expect(await first.result).toEqual(committed);
+    const second = new WorkflowService({ read: vi.fn().mockResolvedValue(read), commit: vi.fn() });
+    const onFailure = vi.fn();
+    expect(await second.execute(caller, sessionId, requestId, { ...claim, revision: 5 }, onFailure))
+      .toEqual({ outcome: 'rejected', reason: 'state' });
+    expect(first.failures).toEqual([]);
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+});
+
